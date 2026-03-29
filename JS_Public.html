@@ -1,315 +1,106 @@
-<style>
-  /* --- Hero Login Section --- */
-  .public-hero-container {
-    display: flex;
-    flex-wrap: wrap;
-    background: linear-gradient(135deg, #795663 0%, #283D3B 100%);
-    border-radius: 0 0 30px 30px;
-    margin: -20px -20px 30px -20px; /* ดึงให้ติดขอบบนและซ้ายขวา */
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    overflow: hidden;
-  }
-
-  .hero-welcome {
-    flex: 1 1 300px;
-    padding: 50px 40px;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .hero-welcome h1 { font-family: 'Kanit', sans-serif; font-size: 32px; margin-bottom: 10px; line-height: 1.3; }
-  .hero-welcome p { font-size: 16px; opacity: 0.9; line-height: 1.6; margin-bottom: 20px; }
-
-  .hero-login-box {
-    flex: 1 1 300px;
-    background: white;
-    margin: 30px 40px 30px 0;
-    padding: 30px;
-    border-radius: 20px;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.2);
-  }
-
-  @media (max-width: 768px) {
-    .public-hero-container { border-radius: 0 0 20px 20px; }
-    .hero-login-box { margin: 0 20px 30px 20px; }
-    .hero-welcome { padding: 30px 20px; text-align: center; }
-  }
-
-  /* --- Enhanced Stats Section --- */
-  .stat-group-title { font-family: 'Kanit', sans-serif; color: #283D3B; border-left: 5px solid #FCE86C; padding-left: 10px; margin-bottom: 20px; }
-  
-  .enhanced-stat-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    border: 1px solid #f0f0f0;
-    transition: transform 0.3s;
-  }
-  .enhanced-stat-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
-  
-  .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-  .stat-icon { font-size: 30px; background: #f9f9f9; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
-  .stat-main-val { font-size: 36px; font-weight: bold; color: #333; font-family: 'Kanit', sans-serif; line-height: 1; }
-  
-  .progress-container { width: 100%; background-color: #eee; border-radius: 10px; height: 8px; margin-top: 15px; overflow: hidden; }
-  .progress-bar { height: 100%; border-radius: 10px; transition: width 1s ease-in-out; }
-  .progress-text { font-size: 12px; color: #666; margin-top: 5px; display: flex; justify-content: space-between; }
-
-  /* --- Public Map Section --- */
-  #public-stray-map-container { height: 400px; width: 100%; border-radius: 16px; border: 2px solid #eee; z-index: 1; }
-</style>
-
 <script>
+  /**
+   * (อัปเดตล่าสุด: เพิ่มฟังก์ชันกดดูรูปใหญ่ในประกาศสัตว์หาย)
+   */
   function loadPublicDashboard() {
     toggleSidebar(false); 
     const pageId = 'public-dashboard-page';
-    let pageDiv = document.getElementById(pageId);
-    
-    if (!pageDiv) {
-        pageDiv = document.createElement('div');
-        pageDiv.id = pageId;
-        document.getElementById('app-content').appendChild(pageDiv);
-    }
+    const pageDiv = document.getElementById(pageId);
+    if (!pageDiv) return;
 
     pageDiv.classList.add('page');
     pageDiv.innerHTML = ""; 
     showLoader(true);
     
-    // ดึงข้อมูล 2 ส่วนพร้อมกัน: สถิติหลัก และ ข้อมูลสัตว์จรจัด
-    Promise.all([
-      new Promise((resolve, reject) => google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getPublicDashboardData()),
-      new Promise((resolve, reject) => google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getPublicStrayData())
-    ])
-    .then(([data, strayRes]) => {
+    google.script.run
+      .withSuccessHandler(data => {
         if (data.error) {
           pageDiv.innerHTML = `<h2>เกิดข้อผิดพลาด: ${data.error}</h2>`;
-          showLoader(false); return;
+          showLoader(false);
+          return;
         }
 
-        // คำนวณเปอร์เซ็นต์เพื่อทำ Progress Bar
-        const totalPets = data.totalActual || 0;
-        const vaxPct = totalPets > 0 ? Math.round((data.vaccinated / totalPets) * 100) : 0;
-        const neuterPct = totalPets > 0 ? Math.round((data.neutered / totalPets) * 100) : 0;
+        let html = `<h2 class="dashboard-title">ภาพรวมข้อมูลทั้งหมด</h2>`;
 
-        let html = `
-          <!-- 1. Hero Login Section (ส่วนบนสุด) -->
-          <div class="public-hero-container">
-             <div class="hero-welcome">
-                <h1>ระบบขึ้นทะเบียนสัตว์เลี้ยง</h1>
-                <p>เทศบาลเมืองบางแก้ว จังหวัดสมุทรปราการ<br><br>ร่วมกันขึ้นทะเบียนสัตว์เลี้ยงของคุณ เพื่อรับสิทธิประโยชน์ในการดูแลสุขภาพสัตว์ และร่วมสร้างชุมชนที่ปลอดภัยจากโรคพิษสุนัขบ้า</p>
-                <div style="display:flex; gap:10px;">
-                   <div style="background:rgba(255,255,255,0.2); padding:10px 15px; border-radius:8px; backdrop-filter:blur(5px);">
-                      <div style="font-size:24px; font-weight:bold;">${data.households.toLocaleString()}</div>
-                      <div style="font-size:12px; opacity:0.8;">บ้านที่เข้าร่วมแล้ว</div>
-                   </div>
-                </div>
-             </div>
-             
-             <div class="hero-login-box">
-                <h2 style="color:#283D3B; margin-top:0; font-family:'Kanit', sans-serif; text-align:center;">เข้าสู่ระบบ</h2>
-                <div id="public-login-error" class="error-message" style="display:none; margin-bottom:15px;"></div>
-                
-                <form id="public-login-form">
-                   <!-- แก้ไข: เปลี่ยนเป็น บ้านเลขที่ และ หมู่ที่ -->
-                   <div style="display: flex; gap: 10px;">
-                     <div class="form-group" style="flex: 2;">
-                        <label style="color:#555;">บ้านเลขที่</label>
-                        <input type="text" id="pub-login-house" class="form-input" required placeholder="เช่น 99/1" style="background:#f9f9f9;">
-                     </div>
-                     <div class="form-group" style="flex: 1;">
-                        <label style="color:#555;">หมู่ที่</label>
-                        <input type="number" id="pub-login-moo" class="form-input" required placeholder="เช่น 1" style="background:#f9f9f9;" min="1">
-                     </div>
-                   </div>
-
-                   <div class="form-group">
-                      <label style="color:#555;">รหัสผ่าน</label>
-                      <input type="password" id="pub-login-pass" class="form-input" required placeholder="••••••••" style="background:#f9f9f9;">
-                   </div>
-                   
-                   <button type="submit" class="form-button" style="width:100%; margin-top:10px;">🔑 เข้าสู่ระบบ</button>
-                </form>
-
-                <!-- แก้ไข: ปุ่มสมัครสมาชิกชัดเจน -->
-                <hr style="border:0; border-top:1px dashed #ddd; margin: 25px 0 15px 0;">
-                <div style="text-align:center;">
-                   <p style="font-size:13px; color:#666; margin-bottom:10px;">ยังไม่เคยขึ้นทะเบียนครัวเรือนใช่หรือไม่?</p>
-                   <button type="button" class="form-button secondary" style="width:100%; background-color:#fff; color:#1982C4; border: 2px solid #1982C4;" onclick="loadLoginPage()">
-                      📝 สมัครสมาชิก / ลงทะเบียนใหม่
-                   </button>
-                </div>
-
-             </div>
-          </div>
-
-          <!-- 2. ประกาศตามหาสัตว์เลี้ยง (ถ้ามี) -->
-          <div id="lost-pets-section" style="display:none; margin-bottom: 40px; border: 2px solid #d32f2f; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(211, 47, 47, 0.15);">
+        // ส่วนแสดงประกาศสัตว์หาย
+        html += `
+          <div id="lost-pets-section" style="display:none; margin-bottom: 30px; border: 2px solid #d32f2f; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(211, 47, 47, 0.15);">
             <div style="background: #d32f2f; color: white; padding: 12px 20px; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
                <span style="font-size: 1.4rem;">🚨</span> ประกาศตามหาสัตว์เลี้ยง (ช่วยกันสอดส่อง)
             </div>
             <div id="lost-pets-grid" class="pet-card-grid" style="padding: 20px; background: #fffafa;"></div>
           </div>
+        `;
 
-          <!-- 3. แดชบอร์ดสถิติ (Enhanced View) -->
-          <h2 class="stat-group-title">📊 สถิติข้อมูลสัตว์เลี้ยงในระบบ</h2>
-          
-          <div class="dashboard-grid" style="margin-bottom:40px;">
-            <!-- สถิติประชากรสัตว์ -->
-            <div class="enhanced-stat-card">
-               <div class="stat-header">
-                  <div style="color:#666; font-size:14px;">ประชากรสุนัขทั้งหมด</div>
-                  <div class="stat-icon">🐕</div>
-               </div>
-               <div class="stat-main-val">${data.dogActual.toLocaleString()} <span style="font-size:16px; font-weight:normal; color:#888;">ตัว</span></div>
-            </div>
-
-            <div class="enhanced-stat-card">
-               <div class="stat-header">
-                  <div style="color:#666; font-size:14px;">ประชากรแมวทั้งหมด</div>
-                  <div class="stat-icon">🐈</div>
-               </div>
-               <div class="stat-main-val">${data.catActual.toLocaleString()} <span style="font-size:16px; font-weight:normal; color:#888;">ตัว</span></div>
-            </div>
-
-            <!-- สถิติสุขภาพ (Progress Bars) -->
-            <div class="enhanced-stat-card" style="grid-column: 1 / -1; border-left: 4px solid var(--color-green);">
-               <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                  <div>
-                     <div style="color:#666; font-size:14px; margin-bottom:5px;">ความคุ้มครองวัคซีนพิษสุนัขบ้า</div>
-                     <div class="stat-main-val">${data.vaccinated.toLocaleString()} <span style="font-size:14px; font-weight:normal; color:#888;">จาก ${totalPets.toLocaleString()} ตัว</span></div>
-                  </div>
-                  <div style="font-size:24px; font-weight:bold; color:var(--color-green); font-family:'Kanit', sans-serif;">${vaxPct}%</div>
-               </div>
-               <div class="progress-container"><div class="progress-bar" style="width: ${vaxPct}%; background-color: var(--color-green);"></div></div>
-            </div>
-
-            <div class="enhanced-stat-card" style="grid-column: 1 / -1; border-left: 4px solid #1982C4;">
-               <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                  <div>
-                     <div style="color:#666; font-size:14px; margin-bottom:5px;">สถิติการควบคุมประชากร (ทำหมัน)</div>
-                     <div class="stat-main-val">${data.neutered.toLocaleString()} <span style="font-size:14px; font-weight:normal; color:#888;">จาก ${totalPets.toLocaleString()} ตัว</span></div>
-                  </div>
-                  <div style="font-size:24px; font-weight:bold; color:#1982C4; font-family:'Kanit', sans-serif;">${neuterPct}%</div>
-               </div>
-               <div class="progress-container"><div class="progress-bar" style="width: ${neuterPct}%; background-color: #1982C4;"></div></div>
-            </div>
-          </div>
-
-          <!-- 4. แผนที่สัตว์จรจัด (นำมาโชว์หน้าแรก) -->
-          <h2 class="stat-group-title">🗺️ จุดเฝ้าระวังและพิกัดสัตว์จรจัด</h2>
-          <div style="background:#fff; padding:20px; border-radius:16px; box-shadow:0 4px 15px rgba(0,0,0,0.05); margin-bottom:20px;">
-             <p style="color:#666; font-size:14px; margin-top:0; margin-bottom:15px;">แผนที่แสดงพิกัดที่ได้รับแจ้งเบาะแสสัตว์จรจัด เพื่อเป็นข้อมูลให้ชุมชนและเจ้าหน้าที่เฝ้าระวัง</p>
-             <div id="public-stray-map-container"></div>
-             <div style="text-align:right; margin-top:15px;">
-                <button class="form-button secondary" style="width:auto; font-size:14px; padding:8px 20px;" onclick="loadStrayPage()">ดูรายละเอียด หรือ แจ้งเพิ่ม 👉</button>
-             </div>
+        // สร้าง HTML การ์ดสรุปยอด
+        html += `<div class="dashboard-grid">`;
+        
+        // การ์ด 1: ครัวเรือน
+        html += `
+          <div class="summary-card card-color-1">
+            <div class="card-title">จำนวนครัวเรือน</div>
+            <div class="card-value-main">${data.households.toLocaleString()} <span class="unit">ครัวเรือน</span></div>
           </div>
         `;
+        
+        // การ์ด 2: สุนัข
+        html += `
+          <div class="summary-card card-color-2">
+            <div class="card-title">จำนวนสุนัข</div>
+            <div class="card-value-main">${data.dogActual.toLocaleString()} <span class="unit">ตัว</span></div>
+          </div>
+        `;
+        
+        // การ์ด 3: แมว
+        html += `
+          <div class="summary-card card-color-3">
+            <div class="card-title">จำนวนแมว</div>
+            <div class="card-value-main">${data.catActual.toLocaleString()} <span class="unit">ตัว</span></div>
+          </div>
+        `;
+        
+        // การ์ด 4: รวม
+        html += `
+          <div class="summary-card card-color-4">
+            <div class="card-title">จำนวนรวม (สุนัข+แมว)</div>
+            <div class="card-value-main">${data.totalActual.toLocaleString()} <span class="unit">ตัว</span></div>
+          </div>
+        `;
+        
+        // การ์ด 5: วัคซีน
+        html += `
+          <div class="summary-card card-color-5">
+            <div class="card-title">ฉีดวัคซีนแล้ว (ที่ลงทะเบียน)</div>
+            <div class="card-value-main">${data.vaccinated.toLocaleString()} <span class="unit">ตัว</span></div>
+          </div>
+        `;
+        
+        // การ์ด 6: ทำหมัน
+        html += `
+          <div class="summary-card card-color-6">
+            <div class="card-title">ทำหมันแล้ว (ที่ลงทะเบียน)</div>
+            <div class="card-value-main">${data.neutered.toLocaleString()} <span class="unit">ตัว</span></div>
+          </div>
+        `;
+        
+        html += `</div>`; // ปิด .dashboard-grid
 
         pageDiv.innerHTML = html;
         navigateTo(pageId);
         
-        // --- ผูก Event ล็อกอินหน้าแรก (ปรับตรรกะใหม่) ---
-        const loginForm = document.getElementById('public-login-form');
-        if(loginForm) {
-            loginForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // ดึงค่าบ้านเลขที่ และ หมู่ที่
-                const houseNo = document.getElementById('pub-login-house').value.trim();
-                const moo = document.getElementById('pub-login-moo').value.trim();
-                const pass = document.getElementById('pub-login-pass').value;
-                const errDiv = document.getElementById('public-login-error');
-                
-                // นำมาต่อกันเป็น HouseholdKey ตามมาตรฐานระบบ (เช่น "99/1-5")
-                const householdKey = houseNo + "-" + moo;
-                
-                showLoader(true);
-                google.script.run.withSuccessHandler(res => {
-                    if(res.success) {
-                        localStorage.setItem('sessionToken', res.token);
-                        initializeApp(); // โหลดระบบใหม่ด้วย token จะพาไปหน้า Member อัตโนมัติ
-                    } else {
-                        showLoader(false);
-                        errDiv.textContent = res.error || "บ้านเลขที่, หมู่ หรือรหัสผ่านไม่ถูกต้อง";
-                        errDiv.style.display = 'block';
-                    }
-                }).withFailureHandler(err => {
-                    showLoader(false);
-                    errDiv.textContent = err.message;
-                    errDiv.style.display = 'block';
-                }).loginUser(householdKey, pass); // ส่ง HouseholdKey และ Password เข้า Server
-            });
-        }
-
-        // --- โหลดฟังก์ชันเสริม ---
-        loadPublicLostPets(); // โหลดสัตว์หาย
+        // เรียกฟังก์ชันโหลดข้อมูลสัตว์หาย
+        loadPublicLostPets();
         
-        // โหลดแผนที่ Leaflet สำหรับหน้า Public
-        if (strayRes.success && strayRes.data) {
-           initPublicStrayMap(strayRes.data);
-        }
-
         showLoader(false);
       })
-      .catch(error => {
+      .withFailureHandler(error => {
         pageDiv.innerHTML = `<h2>เกิดข้อผิดพลาดในการเชื่อมต่อ: ${error.message}</h2>`;
         showLoader(false);
-      });
+      })
+      .getPublicDashboardData();
   }
 
-  // --- ฟังก์ชันสร้างแผนที่หน้าแรก ---
-  var publicStrayMapObj = null;
-  function initPublicStrayMap(strayData) {
-    // ล้างแมปเดิมถ้ามี
-    if (publicStrayMapObj) { publicStrayMapObj.remove(); publicStrayMapObj = null; }
-    
-    // สร้าง Map (พิกัดกลางบางแก้ว)
-    publicStrayMapObj = L.map('public-stray-map-container').setView([13.6433, 100.6650], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(publicStrayMapObj);
-
-    // วนลูปใส่ Marker
-    let locCounts = {}; 
-    strayData.forEach(item => {
-      const lat = parseFloat(item.lat); const lng = parseFloat(item.lng);
-      if (isNaN(lat) || isNaN(lng)) return; 
-
-      // เทคนิคกระจายจุดทับซ้อน (Spiderfy)
-      const locKey = lat.toFixed(5) + ',' + lng.toFixed(5);
-      if (!locCounts[locKey]) locCounts[locKey] = 0; locCounts[locKey]++;
-      const count = locCounts[locKey] - 1;
-      let finalLat = lat; let finalLng = lng;
-      if (count > 0) { 
-          const angle = count * 137.5 * (Math.PI / 180); 
-          const radius = 0.0003 * Math.sqrt(count); 
-          finalLat += radius * Math.cos(angle); 
-          finalLng += radius * Math.sin(angle); 
-      }
-      
-      // เลือกสีตามนิสัย (ง่ายต่อการดู)
-      let colorClass = 'pin-behav-friendly'; // สีเขียว default
-      if (item.behavior && item.behavior.includes('ไม่เป็นมิตร')) colorClass = 'pin-behav-danger'; // สีแดง
-      
-      const icon = L.divIcon({ 
-          className: 'custom-div-icon', 
-          html: `<div class="pin-outer ${colorClass}" style="width:16px; height:16px; border-radius:50%; background:currentColor; box-shadow:0 0 5px rgba(0,0,0,0.5);"></div>`, 
-          iconSize: [16, 16], iconAnchor: [8, 8] 
-      });
-      
-      const popup = `<b>${item.type} ${item.color}</b><br>สถานที่: ${item.location || '-'}<br>นิสัย: ${item.behavior}`;
-      L.marker([finalLat, finalLng], { icon: icon }).bindPopup(popup).addTo(publicStrayMapObj);
-    });
-
-    // แก้ไขบั๊ก Map ไม่เต็มกรอบเวลาโหลดแท็บใหม่
-    setTimeout(() => { publicStrayMapObj.invalidateSize(); }, 500);
-  }
-
-  // --- ฟังก์ชันดึงข้อมูลสัตว์หายมาแสดง ---
+  // ฟังก์ชันดึงข้อมูลสัตว์หายมาแสดง
   function loadPublicLostPets() {
     google.script.run.withSuccessHandler(res => {
       const container = document.getElementById('lost-pets-section');
@@ -320,9 +111,14 @@
         let html = '';
         
         res.pets.forEach(pet => {
+          // จัดการรูปภาพ
           let imgHtml = '';
           if (pet.PetImage && pet.PetImage.toString().startsWith('http')) {
-             imgHtml = `<img src="${pet.PetImage}" style="width:100%; height:220px; object-fit:cover; display:block; cursor:pointer;" onclick="viewImage('${pet.PetImage}')" title="คลิกเพื่อดูภาพขยาย">`;
+             // ✅ เพิ่ม onclick และ cursor:pointer เพื่อให้รู้ว่ากดได้
+             imgHtml = `<img src="${pet.PetImage}" 
+                             style="width:100%; height:220px; object-fit:cover; display:block; cursor:pointer;" 
+                             onclick="viewImage('${pet.PetImage}')" 
+                             title="คลิกเพื่อดูภาพขยาย">`;
           } else {
              imgHtml = `<div style="width:100%; height:220px; background:#f5f5f5; display:flex; align-items:center; justify-content:center; font-size:60px; color:#ddd;">${pet.PetType==='สุนัข'?'🐕':'🐈'}</div>`;
           }
@@ -335,16 +131,24 @@
                     🚨 สูญหาย
                  </div>
                </div>
+               
                <div style="padding:15px; text-align:left;">
                   <div style="margin-bottom: 10px;">
                     <div style="font-size: 0.85rem; color: #d32f2f; font-weight: bold; margin-bottom: 4px;">📍 หายบริเวณ:</div>
                     <div style="font-size: 0.95rem; color: #333; line-height: 1.4;">${pet.MissingLocation || 'ไม่ระบุพิกัด'}</div>
                   </div>
+                  
                   <h3 style="margin: 0 0 5px 0; color: #333; font-size: 1.3rem;">${pet.PetName}</h3>
-                  <p style="font-size: 0.9rem; color: #666; margin: 0 0 15px 0;">พันธุ์: <strong>${pet.Breed}</strong> (${pet.Sex})<br>สี/ตำหนิ: ${pet.ColorMark}</p>
+                  <p style="font-size: 0.9rem; color: #666; margin: 0 0 15px 0;">
+                     พันธุ์: <strong>${pet.Breed}</strong> (${pet.Sex})<br>
+                     สี/ตำหนิ: ${pet.ColorMark}
+                  </p>
+                  
                   <hr style="border:0; border-top:1px dashed #ddd; margin:10px 0;">
+                  
                   <a href="tel:${pet.OwnerPhone}" style="display:block; text-align:center; background:#d32f2f; color:white; text-decoration:none; padding:10px; border-radius:8px; font-weight:bold; transition: background 0.2s;">
-                     📞 โทรแจ้งเจ้าของ<div style="font-size: 0.9rem; font-weight: normal; margin-top: 2px;">${pet.OwnerPhone}</div>
+                     📞 โทรแจ้งเจ้าของ
+                     <div style="font-size: 0.9rem; font-weight: normal; margin-top: 2px;">${pet.OwnerPhone}</div>
                   </a>
                </div>
             </div>
@@ -357,7 +161,15 @@
     }).getLostPetsPublic();
   } 
 
+  // ✅ ฟังก์ชันแสดงภาพขนาดใหญ่ (เพิ่มใหม่สำหรับหน้า Public)
   function viewImage(url) {
-    Swal.fire({ imageUrl: url, imageAlt: 'Pet Image', showConfirmButton: false, showCloseButton: true, background: 'rgba(255, 255, 255, 0.95)', backdrop: `rgba(0,0,0,0.4)` });
+    Swal.fire({
+      imageUrl: url,
+      imageAlt: 'Pet Image',
+      showConfirmButton: false,
+      showCloseButton: true,
+      background: 'rgba(255, 255, 255, 0.95)',
+      backdrop: `rgba(0,0,0,0.4)`
+    });
   }
 </script>
