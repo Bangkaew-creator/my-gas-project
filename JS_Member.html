@@ -1,0 +1,738 @@
+<style>
+  /* --- CSS สำหรับ Card View --- */
+  .pet-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; padding: 10px 0; }
+  .pet-card { background: #fff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; text-align: center; border: 1px solid #f0f0f0; transition: transform 0.2s; position: relative; overflow: hidden; }
+  .pet-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
+  .pet-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #FF9A9E 0%, #FECFEF 100%); z-index: 1; }
+  
+  .pet-card.missing-status { border: 2px solid #ff4d4d; background: #fff0f0; }
+  .pet-card.missing-status::before { background: linear-gradient(90deg, #ff4d4d 0%, #b30000 100%); }
+  .missing-badge { display: none; background: #ff4d4d; color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; }
+  .pet-card.missing-status .missing-badge { display: inline-block; }
+
+  .pet-card-img-wrapper { width: 100px; height: 100px; margin: 10px auto 15px; border-radius: 50%; padding: 3px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); position: relative; }
+  .pet-card-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; cursor: pointer; }
+  .pet-card-name { font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 5px; }
+  .pet-card-breed { font-size: 0.9rem; color: #777; margin-bottom: 10px; }
+  
+  .pet-badges { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; }
+  .pet-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
+  .badge-success { background-color: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9; }
+  .badge-danger { background-color: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; }
+  .badge-warning { background-color: #FFF3E0; color: #EF6C00; border: 1px solid #FFE0B2; }
+
+  .pet-card-actions { border-top: 1px solid #eee; padding-top: 15px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .btn-action { padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; border: none; transition: background 0.2s; display: flex; align-items: center; gap: 5px; }
+  .btn-edit { background: #E3F2FD; color: #1565C0; } .btn-edit:hover { background: #BBDEFB; }
+  .btn-delete { background: #FFEBEE; color: #C62828; } .btn-delete:hover { background: #FFCDD2; }
+  .btn-sos { background: #FFF3E0; color: #EF6C00; border: 1px solid #FFE0B2; } .btn-sos:hover { background: #FFE0B2; }
+  .btn-sos.active { background: #D32F2F; color: white; border: 1px solid #B71C1C; }
+</style>
+
+<script>
+  // --- Global Variables ---
+  var tempMemberPets = [];
+  var editingMemberPetIndex = -1;
+  var currentDashboardOwnerProfile = null; 
+
+  // --- Main Dashboard Loading ---
+  function loadMemberDashboard() {
+    toggleSidebar(false);
+    var userToLoad = adminViewingUser || currentUser; 
+    var pageId = 'member-dashboard-page';
+    var pageDiv = document.getElementById(pageId);
+    
+    if (!pageDiv || !userToLoad) { 
+        handleLogout(); 
+        return; 
+    }
+    
+    pageDiv.classList.add('page');
+    pageDiv.innerHTML = ""; 
+    showLoader(true);
+
+    google.script.run.withSuccessHandler(function(data) {
+        if (!data || data.error) { 
+            pageDiv.innerHTML = '<h2>Error: ' + (data ? data.error : 'No Data') + '</h2>'; 
+            showLoader(false); 
+            return; 
+        }
+        
+        currentDashboardOwnerProfile = data.profileData || {};
+
+        var html = '';
+        if (adminViewingUser) {
+          html += '<button id="admin-back-btn" class="form-button secondary" style="width: auto; margin-bottom: 15px;">⬅️ กลับไปหน้าแอดมิน</button>';
+        }
+        
+        html += '<h2 class="dashboard-title">แดชบอร์ดครัวเรือน (บ้าน: ' + userToLoad.householdKey + ')</h2>';
+        
+        // Cards Summary
+        var d = data;
+        html += '<div class="dashboard-grid">';
+        html += '<div class="summary-card card-color-2"><div class="card-title">สุนัข</div><div class="card-value-main">' + (d.dogActual||0).toLocaleString() + '</div></div>';
+        html += '<div class="summary-card card-color-3"><div class="card-title">แมว</div><div class="card-value-main">' + (d.catActual||0).toLocaleString() + '</div></div>';
+        html += '<div class="summary-card card-color-4"><div class="card-title">รวม</div><div class="card-value-main">' + (d.totalActual||0).toLocaleString() + '</div></div>';
+        html += '<div class="summary-card card-color-5"><div class="card-title">วัคซีนแล้ว</div><div class="card-value-main">' + (d.vaccinated||0).toLocaleString() + '</div></div>';
+        html += '<div class="summary-card card-color-6"><div class="card-title">ทำหมันแล้ว</div><div class="card-value-main">' + (d.neutered||0).toLocaleString() + '</div></div>';
+        html += '<div></div></div>'; 
+
+        if (!adminViewingUser) { html += '<div class="management-section" id="my-profile-section"></div>'; }
+        
+        html += '<div class="management-section">' +
+                   '<div class="section-header">' +
+                     '<h3 class="section-title">🐾 สัตว์เลี้ยงของฉัน</h3>' +
+                     '<button id="add-pet-btn" class="form-button" style="width: auto;">➕ ลงทะเบียนใหม่</button>' +
+                   '</div>' +
+                   '<div id="pets-table-container"><p>กำลังโหลดข้อมูล...</p></div>' +
+                 '</div>';
+        
+        pageDiv.innerHTML = html;
+        navigateTo(pageId);
+        
+        document.getElementById('add-pet-btn').addEventListener('click', openBatchAddMemberPetModal);
+        
+        if (adminViewingUser) {
+           var backBtn = document.getElementById('admin-back-btn');
+           if(backBtn) backBtn.addEventListener('click', function() { adminViewingUser = null; loadAdminDashboard(); });
+        }
+        
+        loadMemberPetsTable();
+        
+        if (!adminViewingUser && data.profileData) { 
+            renderMyProfileSection(data.profileData); 
+        }
+        
+        showLoader(false);
+
+      }).withFailureHandler(function(err) { 
+          pageDiv.innerHTML = '<h2>Connection Error: ' + err.message + '</h2>'; 
+          showLoader(false); 
+      }).getMemberDashboardData(userToLoad.householdKey);
+  }
+
+  function loadMemberPetsTable() {
+    var container = document.getElementById('pets-table-container');
+    if(!container) return;
+    var userToLoad = adminViewingUser || currentUser;
+    
+    google.script.run.withSuccessHandler(function(response) {
+        if (!response || !response.success) { 
+            container.innerHTML = '<p class="error-message">' + (response ? response.error : 'ไม่พบข้อมูล') + '</p>'; 
+            return; 
+        }
+        currentMemberPets = response.pets || [];
+        renderMemberPetsTable(currentMemberPets);
+      }).withFailureHandler(function(err) { 
+          container.innerHTML = '<p class="error-message">Server Error: ' + err.message + '</p>'; 
+      }).getMemberPets(userToLoad.householdKey);
+  }
+
+  function renderMemberPetsTable(pets) {
+    var container = document.getElementById('pets-table-container');
+    if(!container) return;
+
+    if (!pets || pets.length === 0) { 
+      container.innerHTML = '<div style="text-align:center; padding:40px; background:#f9f9f9; border-radius:12px; color:#888;"><div style="font-size:40px;">🐕🐈</div><p>ยังไม่มีข้อมูลสัตว์เลี้ยง</p></div>'; 
+      return; 
+    }
+    
+    var html = '<div class="pet-card-grid">';
+    
+    pets.forEach(function(pet) {
+      var petName = pet.PetName || 'ไม่ระบุชื่อ';
+      var petType = pet.PetType || 'สัตว์เลี้ยง';
+      var icon = petType === 'สุนัข' ? '🐕' : '🐈';
+      
+      var imgHtml = '';
+      var imgUrl = pet.PetImage ? String(pet.PetImage) : '';
+      var fallbackHtml = '<div style="width:100%; height:100%; border-radius:50%; background:#f0f0f0; display:flex; align-items:center; justify-content:center; font-size:40px;">' + icon + '</div>';
+
+      if (imgUrl.startsWith('http')) {
+         imgHtml = '<img src="' + imgUrl + '" class="pet-card-img" onclick="viewImage(\'' + imgUrl + '\')" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">' + 
+                   '<div style="display:none; width:100%; height:100%; border-radius:50%; background:#f0f0f0; align-items:center; justify-content:center; font-size:40px;">' + icon + '</div>';
+      } else {
+         imgHtml = fallbackHtml;
+      }
+
+      var isMissing = (pet.PetStatus === 'สูญหาย');
+      var cardClass = isMissing ? 'pet-card missing-status' : 'pet-card';
+      var sosBtnText = isMissing ? '📢 แจ้งเจอแล้ว' : '🚨 แจ้งหาย';
+      var sosBtnClass = isMissing ? 'btn-sos active' : 'btn-sos';
+
+      var vaxClass = (pet.VaccineStatus === 'ฉีดแล้ว') ? 'badge-success' : 'badge-danger';
+      var neuClass = (pet.NeuteredStatus === 'ทำแล้ว') ? 'badge-success' : 'badge-warning';
+      var sexIcon = (pet.Sex === 'เพศผู้') ? '♂️' : '♀️';
+
+      html += '<div class="' + cardClass + '" id="card-' + pet.PetID + '">' +
+           '<div class="missing-badge">🚨 กำลังสูญหาย</div>' +
+           '<div class="pet-card-img-wrapper">' + imgHtml + '</div>' +
+           '<div class="pet-card-name">' + petName + '</div>' +
+           '<div class="pet-card-breed">' + icon + ' ' + petType + ' | ' + (pet.Sex||'-') + ' ' + sexIcon + '<br><small>พันธุ์: ' + (pet.Breed||'-') + '</small></div>' +
+           
+           '<div class="pet-badges">' +
+              '<span class="pet-badge ' + vaxClass + '">💉 ' + (pet.VaccineStatus||'-') + '</span>' +
+              '<span class="pet-badge ' + neuClass + '">✂️ ' + (pet.NeuteredStatus||'-') + '</span>' +
+           '</div>' +
+           
+           '<div class="pet-card-actions">' +
+              '<button class="btn-action ' + sosBtnClass + '" onclick="toggleMissingStatus(\'' + pet.PetID + '\', ' + isMissing + ')">' + sosBtnText + '</button>' +
+              '<button class="btn-action btn-edit" data-petid="' + pet.PetID + '">✏️ แก้ไข</button>' +
+              '<button class="btn-action btn-delete" data-petid="' + pet.PetID + '" data-petname="' + petName + '">🗑️ ลบ</button>' +
+           '</div>' +
+        '</div>';
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Bind Events
+    var editBtns = container.querySelectorAll('.btn-edit');
+    for (var i = 0; i < editBtns.length; i++) {
+        editBtns[i].addEventListener('click', function(e) { 
+            var petId = e.currentTarget.dataset.petid; 
+            var petData = currentMemberPets.find(function(p){ return p.PetID === petId; }); 
+            openEditPetModal(petData); 
+        });
+    }
+    
+    var delBtns = container.querySelectorAll('.btn-delete');
+    for (var j = 0; j < delBtns.length; j++) {
+        delBtns[j].addEventListener('click', function(e) { 
+            var petId = e.currentTarget.dataset.petid; 
+            var petName = e.currentTarget.dataset.petname; 
+            handleDeletePet(petId, petName); 
+        });
+    }
+  }
+
+  function toggleMissingStatus(petId, currentStatus) {
+    if (currentStatus) {
+      Swal.fire({ title: 'เจอสัตว์เลี้ยงแล้ว?', icon: 'success', showCancelButton: true, confirmButtonText: 'ใช่' }).then(function(result) {
+        if (result.isConfirmed) sendMissingStatus(petId, false, ""); 
+      });
+    } else {
+      Swal.fire({ title: 'แจ้งสัตว์เลี้ยงสูญหาย', input: 'text', inputPlaceholder: 'ระบุสถานที่หาย...', icon: 'warning', showCancelButton: true, confirmButtonText: 'แจ้งหาย', cancelButtonText: 'ยกเลิก' }).then(function(result) {
+        if (result.isConfirmed) sendMissingStatus(petId, true, result.value); 
+      });
+    }
+  }
+
+  function sendMissingStatus(petId, isMissing, location) {
+    showLoader(true);
+    google.script.run.withSuccessHandler(function() { showLoader(false); loadMemberDashboard(); }).togglePetMissingStatus(petId, currentUser.householdKey, isMissing, location);
+  }
+  
+  function viewImage(url) {
+    Swal.fire({ imageUrl: url, showConfirmButton: false, showCloseButton: true, background: 'rgba(255,255,255,0.9)' });
+  }
+
+  // ✅ --- Batch Add Modal (พร้อมรูปภาพ) ---
+  function openBatchAddMemberPetModal() {
+    tempMemberPets = []; editingMemberPetIndex = -1;
+    var html = 
+      '<div class="modal-overlay-close"></div>' +
+      '<div class="modal-content" style="max-width: 800px;">' +
+        '<h2 class="form-title">ลงทะเบียนสัตว์เลี้ยง (เพิ่มได้หลายตัว)</h2>' +
+        '<div id="batch-error" class="error-message"></div>' +
+        '<p style="text-align:center; color:#666; margin-bottom:15px; font-size:14px;">เพิ่มรายชื่อสัตว์เลี้ยงให้ครบก่อน แล้วกดบันทึกข้อมูลทั้งหมดทีเดียว</p>' +
+        
+        '<div id="member-pet-form-box" style="background:#F9F7F5; padding:20px; border-radius:12px; border:1px dashed #8A9688; margin-bottom:20px;">' +
+           '<h4 style="margin-top:0; color:var(--col-hawthorne); margin-bottom:15px; border-bottom:1px solid #ddd; padding-bottom:5px;">1. กรอกข้อมูลสัตว์เลี้ยง</h4>' +
+           
+           // ✅ ส่วนเพิ่มรูปภาพ
+           '<div style="text-align:center; margin-bottom:20px;">' +
+             '<div style="position:relative; display:inline-block;">' +
+                '<img id="batch-preview-image" src="https://via.placeholder.com/150?text=No+Image" ' +
+                     'style="width:100px; height:100px; object-fit:cover; border-radius:50%; border:3px solid #eee; cursor:pointer;" ' +
+                     'onclick="document.getElementById(\'batch-pet-image-input\').click()">' +
+                '<div style="margin-top:5px;">' +
+                  '<label for="batch-pet-image-input" class="form-button secondary" style="width:auto; display:inline-block; cursor:pointer; font-size:12px; padding: 4px 10px;">📷 เพิ่มรูป</label>' +
+                  '<input type="file" id="batch-pet-image-input" accept="image/*" style="display:none;" onchange="handleBatchImageSelect(this)">' +
+                  '<input type="hidden" id="batch-pet-image-base64">' +
+                '</div>' +
+             '</div>' +
+           '</div>' +
+
+           '<div class="form-grid">' +
+             '<div class="form-group"><label>ชื่อสัตว์เลี้ยง</label><input type="text" id="batch-name" class="form-input" placeholder="เช่น แดง"></div>' +
+             '<div class="form-group"><label>อายุ (เช่น 2 ปี)</label><input type="text" id="batch-age" class="form-input"></div>' +
+           '</div>' +
+           '<div class="form-grid">' +
+             '<div class="form-group"><label>ประเภท</label><div class="radio-button-group"><input type="radio" id="batch-type-dog" name="batch-type" value="สุนัข" checked><label for="batch-type-dog" class="radio-btn">🐕 สุนัข</label><input type="radio" id="batch-type-cat" name="batch-type" value="แมว"><label for="batch-type-cat" class="radio-btn">🐈 แมว</label></div></div>' +
+             '<div class="form-group"><label>เพศ</label><div class="radio-button-group"><input type="radio" id="batch-sex-male" name="batch-sex" value="เพศผู้" checked><label for="batch-sex-male" class="radio-btn">♂️ เพศผู้</label><input type="radio" id="batch-sex-female" name="batch-sex" value="เพศเมีย"><label for="batch-sex-female" class="radio-btn">♀️ เพศเมีย</label></div></div>' +
+           '</div>' +
+           '<div class="form-grid">' +
+             '<div class="form-group"><label>สายพันธุ์</label><input type="text" id="batch-breed" class="form-input" placeholder="เช่น ไทย, พุดเดิ้ล"></div>' +
+             '<div class="form-group"><label>สี/ตำหนิ</label><input type="text" id="batch-color" class="form-input" placeholder="เช่น ขาวน้ำตาล"></div>' +
+           '</div>' +
+           '<div class="form-grid">' +
+              '<div class="form-group">' +
+                '<label>วัคซีนพิษสุนัขบ้า</label>' +
+                '<select id="batch-vax" class="form-input" onchange="toggleBatchVaxYear(this.value)">' +
+                  '<option value="ฉีดแล้ว">ฉีดแล้ว</option>' +
+                  '<option value="ยังไม่ฉีด">ยังไม่ฉีด</option>' +
+                  '<option value="ไม่ทราบ">ไม่ทราบ</option>' +
+                '</select>' +
+              '</div>' +
+              '<div class="form-group" id="div-batch-vax-year">' +
+                '<label>ปีที่ฉีด (พ.ศ.)</label>' +
+                '<input type="text" id="batch-vax-year" class="form-input">' +
+              '</div>' +
+           '</div>' +
+           '<div class="form-grid">' +
+              '<div class="form-group"><label>การทำหมัน</label><select id="batch-neuter" class="form-input"><option value="ทำแล้ว">ทำแล้ว</option><option value="ยังไม่ทำ">ยังไม่ทำ</option><option value="ไม่ทราบ">ไม่ทราบ</option></select></div>' +
+              '<div class="form-group"><label>สถานที่เลี้ยง</label><select id="batch-location" class="form-input"><option value="บ้านพักอาศัย">บ้านพักอาศัย</option><option value="สถานที่เอกชน">สถานที่เอกชน</option><option value="เลี้ยงบริเวณหมู่บ้าน">เลี้ยงบริเวณหมู่บ้าน</option></select></div>' +
+           '</div>' +
+           '<div class="form-group"><label>ลักษณะการเลี้ยง</label><select id="batch-rearing" class="form-input"><option value="เลี้ยงในพื้นที่จำกัดตลอดเวลา">เลี้ยงในพื้นที่จำกัดตลอดเวลา</option><option value="เลี้ยงในพื้นที่จำกัดบางเวลา">เลี้ยงในพื้นที่จำกัดบางเวลา</option><option value="เลี้ยงแบบปล่อยตลอดเวลา">เลี้ยงแบบปล่อยตลอดเวลา</option></select></div>' +
+           '<div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">' +
+             '<button id="btn-cancel-edit-member" class="form-button" onclick="cancelEditTempMemberPet()" style="display:none; background:#AAA; width:auto;">ยกเลิกแก้ไข</button>' +
+             '<button id="btn-add-temp-member" class="form-button secondary" onclick="addTempMemberPet()" style="width:auto;">+ เพิ่มลงรายการ</button>' +
+           '</div>' +
+        '</div>' +
+        '<h4 style="color:var(--col-hawthorne);">2. รายการสัตว์ที่จะบันทึก</h4>' +
+        '<div id="batch-list-container" style="border:1px solid #ddd; padding:15px; border-radius:8px; margin-bottom:20px; min-height:50px;">' +
+           '<p style="text-align:center; color:#ccc;">ยังไม่มีรายการ</p>' +
+        '</div>' +
+        '<button class="form-button success" onclick="submitBatchMemberPets()">บันทึกข้อมูลทั้งหมด ✅</button>' +
+      '</div>';
+    modalContainer.innerHTML = html;
+    modalContainer.style.display = 'flex';
+    modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
+    toggleBatchVaxYear("ฉีดแล้ว");
+  }
+
+  function handleBatchImageSelect(input) {
+    if (input.files && input.files[0]) {
+       var file = input.files[0];
+       resizeImage(file, 500, 0.7, function(base64) {
+          document.getElementById('batch-preview-image').src = base64;
+          document.getElementById('batch-pet-image-base64').value = base64;
+       });
+    }
+  }
+
+  function toggleBatchVaxYear(val) { var div = document.getElementById('div-batch-vax-year'); if(div) div.style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+  
+  function addTempMemberPet() { 
+    var name = document.getElementById('batch-name').value; if(!name){Swal.fire('กรุณาระบุชื่อสัตว์เลี้ยง');return;} 
+    var type = document.querySelector('input[name="batch-type"]:checked').value; 
+    var sex = document.querySelector('input[name="batch-sex"]:checked').value; 
+    var vax = document.getElementById('batch-vax').value; 
+    var vaxYear = document.getElementById('batch-vax-year').value;
+    
+    // ✅ Safe Access: ป้องกัน Error ถ้าหา element ไม่เจอ
+    var imgEl = document.getElementById('batch-pet-image-base64');
+    var imageBase64 = imgEl ? imgEl.value : "";
+
+    var petObj={
+        PetName:name,
+        Age:document.getElementById('batch-age').value,
+        PetType:type,
+        Sex:sex,
+        Breed:document.getElementById('batch-breed').value,
+        ColorMark:document.getElementById('batch-color').value,
+        VaccineStatus:vax,
+        VaccineYear:(vax==='ฉีดแล้ว')?vaxYear:'-',
+        NeuteredStatus:document.getElementById('batch-neuter').value,
+        Location:document.getElementById('batch-location').value,
+        RearingStyle:document.getElementById('batch-rearing').value,
+        PetImageBase64: imageBase64 // ส่งรูปไปด้วย
+    }; 
+    
+    if(editingMemberPetIndex===-1){
+        tempMemberPets.push(petObj);
+    }else{
+        tempMemberPets[editingMemberPetIndex]=petObj;
+        cancelEditTempMemberPet();
+    } 
+    renderTempMemberPets(); 
+    
+    // Clear Fields
+    document.getElementById('batch-name').value=''; 
+    document.getElementById('batch-breed').value=''; 
+    document.getElementById('batch-color').value=''; 
+    document.getElementById('batch-age').value='';
+    if(imgEl) imgEl.value = '';
+    var previewEl = document.getElementById('batch-preview-image');
+    if(previewEl) previewEl.src = "https://via.placeholder.com/150?text=No+Image";
+  }
+
+  function editTempMemberPet(index) { 
+    var item=tempMemberPets[index]; 
+    editingMemberPetIndex=index; 
+    document.getElementById('batch-name').value=item.PetName; 
+    document.getElementById('batch-age').value=item.Age; 
+    document.getElementById('batch-breed').value=item.Breed; 
+    document.getElementById('batch-color').value=item.ColorMark; 
+    document.getElementById('batch-vax').value=item.VaccineStatus; 
+    document.getElementById('batch-vax-year').value=(item.VaccineStatus==='ฉีดแล้ว')?item.VaccineYear:''; 
+    toggleBatchVaxYear(item.VaccineStatus); 
+    document.getElementById('batch-neuter').value=item.NeuteredStatus; 
+    document.getElementById('batch-location').value=item.Location; 
+    document.getElementById('batch-rearing').value=item.RearingStyle; 
+    
+    // Load Image
+    var previewEl = document.getElementById('batch-preview-image');
+    var imgEl = document.getElementById('batch-pet-image-base64');
+    
+    if(item.PetImageBase64) {
+       if(previewEl) previewEl.src = item.PetImageBase64;
+       if(imgEl) imgEl.value = item.PetImageBase64;
+    } else {
+       if(previewEl) previewEl.src = "https://via.placeholder.com/150?text=No+Image";
+       if(imgEl) imgEl.value = "";
+    }
+
+    if(item.PetType==='สุนัข') document.getElementById('batch-type-dog').checked=true; else document.getElementById('batch-type-cat').checked=true; 
+    if(item.Sex==='เพศผู้') document.getElementById('batch-sex-male').checked=true; else document.getElementById('batch-sex-female').checked=true; 
+    
+    var btnAdd = document.getElementById('btn-add-temp-member'); 
+    btnAdd.innerText='💾 บันทึกการแก้ไข'; 
+    btnAdd.classList.remove('secondary'); 
+    btnAdd.classList.add('success'); 
+    document.getElementById('btn-cancel-edit-member').style.display='inline-block'; 
+  }
+
+  function cancelEditTempMemberPet() { 
+    editingMemberPetIndex=-1; 
+    var btnAdd = document.getElementById('btn-add-temp-member'); 
+    btnAdd.innerText='+ เพิ่มลงรายการ'; 
+    btnAdd.classList.add('secondary'); 
+    btnAdd.classList.remove('success'); 
+    document.getElementById('btn-cancel-edit-member').style.display='none'; 
+    
+    document.getElementById('batch-name').value=''; 
+    document.getElementById('batch-breed').value=''; 
+    document.getElementById('batch-color').value=''; 
+    document.getElementById('batch-age').value='';
+    document.getElementById('batch-pet-image-base64').value='';
+    document.getElementById('batch-preview-image').src = "https://via.placeholder.com/150?text=No+Image";
+  }
+
+  function renderTempMemberPets() { 
+    var container=document.getElementById('batch-list-container'); 
+    if(tempMemberPets.length===0){container.innerHTML='<p style="text-align:center; color:#ccc;">ยังไม่มีรายการ</p>';return;} 
+    var html=''; 
+    tempMemberPets.forEach(function(p,i){ 
+        var icon=p.PetType==='สุนัข'?'🐕':'🐈'; 
+        var imgDisplay = p.PetImageBase64 ? '<img src="' + p.PetImageBase64 + '" style="width:30px; height:30px; border-radius:50%; object-fit:cover; margin-right:5px; vertical-align:middle;">' : '';
+        
+        html+='<div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee;">' +
+              '<div>' + imgDisplay + ' <strong>' + (i+1) + '. ' + icon + ' ' + p.PetName + '</strong> (' + p.Sex + ') <br><small>' + p.Breed + ', ' + p.ColorMark + ' | 💉 ' + p.VaccineStatus + ' | ✂️ ' + p.NeuteredStatus + '</small></div>' +
+              '<div><button class="icon-button edit-btn" onclick="editTempMemberPet(' + i + ')">✏️</button><button class="icon-button delete-btn" onclick="removeTempMemberPet(' + i + ')">✕</button></div></div>'; 
+    }); 
+    container.innerHTML=html; 
+  }
+  
+  function removeTempMemberPet(i) { 
+    tempMemberPets.splice(i,1); 
+    if(editingMemberPetIndex===i) cancelEditTempMemberPet(); 
+    else if(editingMemberPetIndex>i) editingMemberPetIndex--; 
+    renderTempMemberPets(); 
+  }
+
+  function submitBatchMemberPets() { 
+    if(tempMemberPets.length===0){Swal.fire('กรุณาเพิ่มสัตว์เลี้ยงอย่างน้อย 1 ตัว');return;} 
+    var userToLoad=adminViewingUser||currentUser; 
+    showLoader(true); 
+    google.script.run.withSuccessHandler(function(res){
+        showLoader(false); 
+        if(res.success){
+            closePetModal(); 
+            Swal.fire({icon:'success',title:'บันทึกสำเร็จ',text:'เพิ่มสัตว์เลี้ยง ' + res.count + ' ตัวเรียบร้อยแล้ว'}); 
+            loadMemberDashboard();
+        }else{
+            Swal.fire('Error',res.error,'error');
+        }
+    }).withFailureHandler(function(err){
+        showLoader(false);
+        Swal.fire('Error',err.message,'error');
+    }).saveMemberPetsBatch(tempMemberPets,userToLoad.householdKey); 
+  }
+
+  // --- Existing Edit Modal ---
+  function openEditPetModal(petData) {
+    if (!petData) return; 
+    var typeDogChecked = (petData.PetType === 'สุนัข') ? 'checked' : '';
+    var typeCatChecked = (petData.PetType === 'แมว') ? 'checked' : '';
+    var sexMaleChecked = (petData.Sex === 'เพศผู้') ? 'checked' : '';
+    var sexFemaleChecked = (petData.Sex === 'เพศเมีย') ? 'checked' : '';
+
+    var html = 
+      '<div class="modal-overlay-close"></div>' +
+      '<div class="modal-content">' +
+        '<h2 class="form-title">แก้ไขข้อมูลสัตว์เลี้ยง</h2>' +
+        
+        '<div style="text-align:center; margin-bottom:20px;">' +
+           '<div style="position:relative; display:inline-block;">' +
+              '<img id="preview-image" src="' + (petData.PetImage || 'https://via.placeholder.com/150?text=No+Image') + '" ' +
+                   'style="width:120px; height:120px; object-fit:cover; border-radius:50%; border:3px solid #eee; cursor:pointer;" ' +
+                   'onclick="document.getElementById(\'pet-image-input\').click()">' +
+              '<div style="margin-top:10px;">' +
+                '<label for="pet-image-input" class="form-button secondary" style="width:auto; display:inline-block; cursor:pointer; font-size:14px; padding: 5px 15px;">📷 เปลี่ยนรูปภาพ</label>' +
+                '<input type="file" id="pet-image-input" accept="image/*" style="display:none;" onchange="handleImageSelect(this)">' +
+                '<input type="hidden" id="pet-image-base64"> ' +
+              '</div>' +
+           '</div>' +
+        '</div>' +
+
+        '<div id="pet-form-error" class="error-message"></div>' +
+        '<form id="pet-form">' +
+          '<input type="hidden" id="pet-id" value="' + petData.PetID + '">' +
+          '<div class="form-grid">' +
+            '<div class="form-group"><label>1. ชื่อสัตว์เลี้ยง</label><input type="text" id="pet-name" class="form-input" required value="' + petData.PetName + '"></div>' +
+            '<div class="form-group"><label>6. อายุ</label><input type="text" id="pet-age" class="form-input" value="' + petData.Age + '"></div>' +
+          '</div>' +
+          '<div class="form-grid">' +
+            '<div class="form-group"><label>2. ประเภท</label><div class="radio-button-group"><input type="radio" id="pet-type-dog" name="pet-type" value="สุนัข" ' + typeDogChecked + ' required><label for="pet-type-dog" class="radio-btn">🐕 สุนัข</label><input type="radio" id="pet-type-cat" name="pet-type" value="แมว" ' + typeCatChecked + '><label for="pet-type-cat" class="radio-btn">🐈 แมว</label></div></div>' +
+            '<div class="form-group"><label>3. เพศ</label><div class="radio-button-group"><input type="radio" id="pet-sex-male" name="pet-sex" value="เพศผู้" ' + sexMaleChecked + ' required><label for="pet-sex-male" class="radio-btn">♂️ ผู้</label><input type="radio" id="pet-sex-female" name="pet-sex" value="เพศเมีย" ' + sexFemaleChecked + '><label for="pet-sex-female" class="radio-btn">♀️ เมีย</label></div></div>' +
+          '</div>' +
+          '<div class="form-grid">' +
+            '<div class="form-group"><label>4. สายพันธุ์</label><input type="text" id="pet-breed" class="form-input" value="' + petData.Breed + '"></div>' +
+            '<div class="form-group"><label>5. สี/อัตลักษณ์</label><input type="text" id="pet-color" class="form-input" value="' + petData.ColorMark + '"></div>' +
+          '</div>' +
+          '<hr style="border:0; border-top:1px solid #eee; margin: 15px 0;">' +
+          '<div class="form-grid">' +
+            '<div class="form-group">' +
+                '<label>7. วัคซีนพิษสุนัขบ้า</label>' +
+                '<select id="pet-vax" class="form-input" required onchange="togglePetVaxYear(this.value)">' +
+                    '<option value="ไม่ทราบ" ' + (petData.VaccineStatus === 'ไม่ทราบ' ? 'selected' : '') + '>ไม่ทราบ</option>' +
+                    '<option value="ฉีดแล้ว" ' + (petData.VaccineStatus === 'ฉีดแล้ว' ? 'selected' : '') + '>ฉีดแล้ว</option>' +
+                    '<option value="ยังไม่ฉีด" ' + (petData.VaccineStatus === 'ยังไม่ฉีด' ? 'selected' : '') + '>ยังไม่ฉีด</option>' +
+                '</select>' +
+            '</div>' +
+            '<div class="form-group" id="div-pet-vax-year" style="display: ' + (petData.VaccineStatus === 'ฉีดแล้ว' ? 'block' : 'none') + ';">' +
+                '<label>8. ปี พ.ศ.</label>' +
+                '<input type="text" id="pet-vax-year" class="form-input" value="' + (petData.VaccineYear || '') + '">' +
+            '</div>' +
+          '</div>' +
+          '<div class="form-group"><label>9. การทำหมัน</label><select id="pet-neuter" class="form-input" required><option value="ไม่ทราบ" ' + (petData.NeuteredStatus === 'ไม่ทราบ' ? 'selected' : '') + '>ไม่ทราบ</option><option value="ทำแล้ว" ' + (petData.NeuteredStatus === 'ทำแล้ว' ? 'selected' : '') + '>ทำแล้ว</option><option value="ยังไม่ทำ" ' + (petData.NeuteredStatus === 'ยังไม่ทำ' ? 'selected' : '') + '>ยังไม่ทำ</option></select></div>' +
+          '<div class="form-group"><label>10. ลักษณะการเลี้ยง</label><select id="pet-rearing" class="form-input" required><option value="เลี้ยงในพื้นที่จำกัดตลอดเวลา" ' + (petData.RearingStyle === 'เลี้ยงในพื้นที่จำกัดตลอดเวลา' ? 'selected' : '') + '>เลี้ยงในพื้นที่จำกัดตลอดเวลา</option><option value="เลี้ยงในพื้นที่จำกัดบางเวลา" ' + (petData.RearingStyle === 'เลี้ยงในพื้นที่จำกัดบางเวลา' ? 'selected' : '') + '>เลี้ยงในพื้นที่จำกัดบางเวลา</option><option value="เลี้ยงแบบปล่อยตลอดเวลา" ' + (petData.RearingStyle === 'เลี้ยงแบบปล่อยตลอดเวลา' ? 'selected' : '') + '>เลี้ยงแบบปล่อยตลอดเวลา</option></select></div>' +
+          '<div class="form-group"><label>11. สถานที่เลี้ยง</label><select id="pet-location" class="form-input" required><option value="บ้านพักอาศัย" ' + (petData.Location === 'บ้านพักอาศัย' ? 'selected' : '') + '>บ้านพักอาศัย</option><option value="สถานที่ราชการ" ' + (petData.Location === 'สถานที่ราชการ' ? 'selected' : '') + '>สถานที่ราชการ</option><option value="วัด" ' + (petData.Location === 'วัด' ? 'selected' : '') + '>วัด</option><option value="ตลาด" ' + (petData.Location === 'ตลาด' ? 'selected' : '') + '>ตลาด</option><option value="เลี้ยงบริเวณหมู่บ้าน" ' + (petData.Location === 'เลี้ยงบริเวณหมู่บ้าน' ? 'selected' : '') + '>เลี้ยงบริเวณหมู่บ้าน</option><option value="สถานที่เอกชน" ' + (petData.Location === 'สถานที่เอกชน' ? 'selected' : '') + '>สถานที่เอกชน</option></select></div>' +
+          
+          '<button type="submit" class="form-button">บันทึกการแก้ไข</button>' +
+        '</form>' +
+      '</div>';
+      
+    modalContainer.innerHTML = html;
+    modalContainer.style.display = 'flex';
+    modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
+    
+    document.getElementById('pet-form').addEventListener('submit', handlePetFormSubmitWithImage);
+  }
+
+  function handleImageSelect(input) {
+    if (input.files && input.files[0]) {
+       var file = input.files[0];
+       var preview = document.getElementById('preview-image');
+       preview.style.opacity = '0.5';
+       resizeImage(file, 500, 0.7, function(base64) {
+          preview.src = base64;
+          preview.style.opacity = '1';
+          document.getElementById('pet-image-base64').value = base64;
+       });
+    }
+  }
+
+  function togglePetVaxYear(val) { var div = document.getElementById('div-pet-vax-year'); if(div) div.style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+  function closePetModal() { modalContainer.style.display = 'none'; modalContainer.innerHTML = ''; }
+  
+  function handlePetFormSubmitWithImage(event) {
+    event.preventDefault(); 
+    var userToLoad = adminViewingUser || currentUser;
+    if (!userToLoad || !userToLoad.householdKey) { Swal.fire('Error', 'ไม่พบข้อมูลผู้ใช้', 'error'); return; }
+    showLoader(true);
+    
+    var petType = document.querySelector('input[name="pet-type"]:checked') ? document.querySelector('input[name="pet-type"]:checked').value : null;
+    var sex = document.querySelector('input[name="pet-sex"]:checked') ? document.querySelector('input[name="pet-sex"]:checked').value : null;
+    
+    var petInfo = { 
+      PetID: document.getElementById('pet-id').value, 
+      PetName: document.getElementById('pet-name').value, 
+      PetType: petType, Sex: sex, 
+      Breed: document.getElementById('pet-breed').value, 
+      ColorMark: document.getElementById('pet-color').value, 
+      Age: document.getElementById('pet-age').value, 
+      VaccineStatus: document.getElementById('pet-vax').value, 
+      VaccineYear: document.getElementById('pet-vax-year').value, 
+      NeuteredStatus: document.getElementById('pet-neuter').value, 
+      RearingStyle: document.getElementById('pet-rearing').value, 
+      Location: document.getElementById('pet-location').value 
+    };
+
+    if (!petInfo.PetType || !petInfo.Sex) { 
+       document.getElementById('pet-form-error').textContent = 'กรุณาเลือกประเภทและเพศ'; 
+       document.getElementById('pet-form-error').style.display = 'block'; 
+       showLoader(false); return; 
+    }
+
+    var imageBase64 = document.getElementById('pet-image-base64').value;
+    
+    google.script.run.withSuccessHandler(function(res) {
+        if (!res.success) { 
+           showLoader(false); 
+           document.getElementById('pet-form-error').textContent = res.error; 
+           document.getElementById('pet-form-error').style.display = 'block'; 
+           return; 
+        }
+        if (imageBase64) {
+           google.script.run.withSuccessHandler(function(imgRes) {
+                showLoader(false);
+                if (imgRes.success) { 
+                   Toast.fire({ icon: 'success', title: 'สำเร็จ', text: 'บันทึกเรียบร้อย' }); 
+                   closePetModal(); 
+                   loadMemberDashboard(); 
+                } else { 
+                   Toast.fire({ icon: 'warning', title: 'เตือน', text: 'บันทึกแล้ว แต่รูปมีปัญหา: ' + imgRes.error }); 
+                   closePetModal(); 
+                   loadMemberDashboard(); 
+                }
+            }).withFailureHandler(function(err) { 
+                showLoader(false); 
+                Toast.fire({ icon: 'warning', title: 'เตือน', text: 'อัปโหลดรูปภาพล้มเหลว: ' + err.message }); 
+                closePetModal(); 
+                loadMemberDashboard(); 
+            }).savePetImage(imageBase64, petInfo.PetID, userToLoad.householdKey);
+        } else { 
+           showLoader(false); 
+           Toast.fire({ icon: 'success', title: 'สำเร็จ', text: 'บันทึกเรียบร้อย' }); 
+           closePetModal(); 
+           loadMemberDashboard(); 
+        }
+    }).withFailureHandler(function(err) { 
+        showLoader(false); 
+        document.getElementById('pet-form-error').textContent = err.message; 
+        document.getElementById('pet-form-error').style.display = 'block'; 
+    }).updatePet(petInfo, userToLoad.householdKey);
+  }
+  
+  function handleDeletePet(petId, petName) {
+    var userToLoad = adminViewingUser || currentUser;
+    Swal.fire({
+      title: 'คุณแน่ใจหรือไม่?',
+      html: 'คุณต้องการลบ <b>' + petName + '</b> ออกจากระบบหรือไม่?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#FF6A91',
+      cancelButtonColor: '#aaa',
+      confirmButtonText: 'ใช่, ลบเลย!',
+      cancelButtonText: 'ยกเลิก'
+    }).then(function(result) {
+      if (result.isConfirmed) {
+        showLoader(true);
+        google.script.run.withSuccessHandler(function(response) {
+            showLoader(false);
+            if (response.success) { 
+                Toast.fire({ icon: 'success', title: 'ลบสำเร็จ', text: 'ข้อมูล ' + petName + ' ถูกลบแล้ว' }); 
+                loadMemberDashboard(); 
+            } else { 
+                Toast.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: response.error }); 
+            }
+        }).withFailureHandler(function(err) { 
+            Toast.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.message }); 
+            showLoader(false); 
+        }).deletePet(petId, userToLoad.householdKey);
+      }
+    });
+  }
+
+  function renderMyProfileSection(profileData) {
+    var container = document.getElementById('my-profile-section');
+    if (!container) return;
+    var name = (profileData && profileData.fullName) ? profileData.fullName : '-';
+    var phone = (profileData && profileData.phone) ? String(profileData.phone).replace(/'/g,'') : '-';
+    var idCard = (profileData && profileData.idCard) ? String(profileData.idCard).replace(/'/g,'') : '-';
+
+    var html = '<div class="section-title">ข้อมูลส่วนตัว</div>' +
+      '<div class="profile-details">' +
+        '<p><strong>ชื่อ-สกุล:</strong> ' + name + '</p>' +
+        '<p><strong>เบอร์โทร:</strong> ' + phone + '</p>' +
+        '<p><strong>บัตร ปชช.:</strong> ' + idCard + '</p>' +
+      '</div>' +
+      '<div class="profile-actions">' +
+        '<button id="edit-profile-btn" class="form-button secondary">✏️ แก้ไขข้อมูล</button>' +
+        '<button id="change-pass-btn" class="form-button">🔑 เปลี่ยนรหัสผ่าน</button>' +
+      '</div>';
+    container.innerHTML = html;
+    document.getElementById('edit-profile-btn').addEventListener('click', function() { openMyProfileModal(profileData); });
+    document.getElementById('change-pass-btn').addEventListener('click', openChangePasswordModal);
+  }
+
+  function openMyProfileModal(currentData) {
+    var name = (currentData && currentData.fullName) ? currentData.fullName : '';
+    var phone = (currentData && currentData.phone) ? String(currentData.phone).replace(/'/g,'') : '';
+    var idCard = (currentData && currentData.idCard) ? String(currentData.idCard).replace(/'/g,'') : '';
+
+    var html = '<div class="modal-overlay-close"></div>' +
+      '<div class="modal-content" style="max-width: 500px;">' +
+        '<h2 class="form-title">แก้ไขข้อมูลส่วนตัว</h2>' +
+        '<div id="my-profile-error" class="error-message"></div>' +
+        '<form id="my-profile-form">' +
+          '<div class="form-group"><label>ชื่อ-นามสกุล (ผู้ให้ข้อมูล)</label><input type="text" id="my-profile-name" class="form-input" required value="' + name + '"></div>' +
+          '<div class="form-group"><label>เบอร์โทรศัพท์</label><input type="tel" id="my-profile-phone" class="form-input" required value="' + phone + '"></div>' +
+          '<div class="form-group"><label>หมายเลขบัตรประชาชน (ไม่บังคับ)</label><input type="text" id="my-profile-idcard" class="form-input" value="' + idCard + '"></div>' +
+          '<button type="submit" class="form-button">บันทึกการแก้ไข</button>' +
+        '</form>' +
+      '</div>';
+    modalContainer.innerHTML = html;
+    modalContainer.style.display = 'flex';
+    modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
+    document.getElementById('my-profile-form').addEventListener('submit', handleMyProfileSubmit);
+  }
+
+  function handleMyProfileSubmit(event) {
+    event.preventDefault(); showLoader(true);
+    var errorDiv = document.getElementById('my-profile-error'); errorDiv.style.display = 'none';
+    var memberData = { fullName: document.getElementById('my-profile-name').value, phone: document.getElementById('my-profile-phone').value, idCard: document.getElementById('my-profile-idcard').value };
+    if (!memberData.fullName || !memberData.phone) { errorDiv.textContent = 'กรุณากรอกชื่อและเบอร์โทรศัพท์'; errorDiv.style.display = 'block'; showLoader(false); return; }
+    google.script.run.withSuccessHandler(function(response) {
+        if (response.success) { closePetModal(); showLoader(false); currentUser.name = memberData.fullName; updateNavForLogin(currentUser); Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ', text: 'ข้อมูลส่วนตัวของคุณถูกอัปเดตแล้ว' }); loadMemberDashboard(); } 
+        else { errorDiv.textContent = response.message; errorDiv.style.display = 'block'; showLoader(false); }
+    }).withFailureHandler(function(err) { errorDiv.textContent = err.message; errorDiv.style.display = 'block'; showLoader(false); }).adminUpdateMemberDetails(currentUser.householdKey, memberData);
+  }
+
+  function openChangePasswordModal() {
+    var html = '<div class="modal-overlay-close"></div>' +
+      '<div class="modal-content" style="max-width: 500px;">' +
+        '<h2 class="form-title">เปลี่ยนรหัสผ่าน</h2>' +
+        '<div id="change-pass-error" class="error-message"></div>' +
+        '<form id="change-pass-form">' +
+          '<div class="form-group"><label>รหัสผ่านเดิม</label><input type="password" id="change-pass-old" class="form-input" required></div>' +
+          '<div class="form-group"><label>รหัสผ่านใหม่</label><input type="password" id="change-pass-new1" class="form-input" required></div>' +
+          '<div class="form-group"><label>ยืนยันรหัสผ่านใหม่</label><input type="password" id="change-pass-new2" class="form-input" required></div>' +
+          '<button type="submit" class="form-button">ยืนยันการเปลี่ยนรหัสผ่าน</button>' +
+        '</form>' +
+      '</div>';
+    modalContainer.innerHTML = html;
+    modalContainer.style.display = 'flex';
+    modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
+    document.getElementById('change-pass-form').addEventListener('submit', handleChangePasswordSubmit);
+  }
+
+  function handleChangePasswordSubmit(event) {
+    event.preventDefault(); showLoader(true);
+    var errorDiv = document.getElementById('change-pass-error'); errorDiv.style.display = 'none';
+    var oldPass = document.getElementById('change-pass-old').value; var newPass1 = document.getElementById('change-pass-new1').value; var newPass2 = document.getElementById('change-pass-new2').value;
+    if (newPass1 !== newPass2) { errorDiv.textContent = 'รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน'; errorDiv.style.display = 'block'; showLoader(false); return; }
+    google.script.run.withSuccessHandler(function(response) {
+        if (response.success) { closePetModal(); showLoader(false); Toast.fire({ icon: 'success', title: 'สำเร็จ', text: 'รหัสผ่านของคุณถูกเปลี่ยนแล้ว' }); } 
+        else { errorDiv.textContent = response.message; errorDiv.style.display = 'block'; showLoader(false); }
+    }).withFailureHandler(function(err) { errorDiv.textContent = err.message; errorDiv.style.display = 'block'; showLoader(false); }).changeMyPassword(currentUser.householdKey, oldPass, newPass1);
+  }
+
+  function resizeImage(file, maxWidth, quality, callback) {
+    var reader = new FileReader(); reader.readAsDataURL(file);
+    reader.onload = function(event) {
+      var img = new Image(); img.src = event.target.result;
+      img.onload = function() {
+        var width = img.width; var height = img.height;
+        if (width > maxWidth) { height = Math.round(height * (maxWidth / width)); width = maxWidth; }
+        var canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+        var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+        var dataUrl = canvas.toDataURL('image/jpeg', quality); callback(dataUrl);
+      };
+    };
+  }
+  function closePetModal() { modalContainer.style.display = 'none'; }
+</script>

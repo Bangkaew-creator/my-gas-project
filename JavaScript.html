@@ -1,0 +1,133 @@
+<script>
+  // ... (ส่วน TOAST และ GLOBAL VARIABLES เหมือนเดิม) ...
+  const Toast = Swal.mixin({
+    toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true,
+    didOpen: (toast) => { toast.addEventListener('mouseenter', Swal.stopTimer); toast.addEventListener('mouseleave', Swal.resumeTimer); }
+  });
+
+  const loader = document.getElementById('loader-overlay');
+  const appContent = document.getElementById('app-content');
+  const navTitle = document.querySelector('.navbar-title');
+  const modalContainer = document.getElementById('modal-container');
+  const mainMenuBar = document.getElementById('main-menu-bar');
+  
+  let currentUser = null;
+  let currentMemberPets = [];
+  let adminViewingUser = null; 
+  
+  function showLoader(show) {
+    if (show) { loader.style.display = 'flex'; loader.style.opacity = 1; } 
+    else { loader.style.opacity = 0; setTimeout(() => { loader.style.display = 'none'; }, 300); }
+  }
+
+  function navigateTo(pageId) {
+    const allPages = appContent.querySelectorAll('.page');
+    allPages.forEach(page => { page.classList.remove('page-active'); });
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) { targetPage.classList.add('page-active'); }
+    else { console.error("Page not found:", pageId); }
+    
+    // Manage active state of buttons
+    document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active-menu'));
+  }
+
+  function initializeApp() {
+    navTitle.textContent = 'ระบบลงทะเบียนสุนัขและแมวในพื้นที่เทศบาลเมืองบางแก้ว จังหวัดสมุทรปราการ';
+    const token = localStorage.getItem('sessionToken');
+    if (token) {
+      showLoader(true);
+      google.script.run.withSuccessHandler(userData => {
+          if (userData) {
+            updateNavForLogin(userData); 
+            if (userData.role === 'Admin') loadAdminDashboard();
+            else loadMemberDashboard(); 
+          } else {
+            updateNavForLogout(); loadPublicDashboard(); 
+          }
+        }).withFailureHandler(err => { updateNavForLogout(); loadPublicDashboard(); }).checkSession(token); 
+    } else {
+      updateNavForLogout(); loadPublicDashboard();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initializeApp);
+  function toggleSidebar(show) {} // Dummy
+
+  function updateNavForLogin(userData) {
+    currentUser = userData;
+    mainMenuBar.innerHTML = ''; 
+
+    const welcomeText = document.createElement('div');
+    welcomeText.className = 'menu-welcome';
+    welcomeText.innerHTML = `สวัสดี, <b>${userData.name}</b>`; // ใช้ class ใหม่จาก Style.css แต่ถ้าไม่มีใส่ inline style ไปก่อนได้
+    welcomeText.style.marginRight = "10px";
+    mainMenuBar.appendChild(welcomeText);
+    
+    // ปุ่ม Dashboard
+    const memberBtn = document.createElement('button');
+    memberBtn.className = 'nav-button';
+    memberBtn.innerHTML = `<span class="icon">🏠</span> แดชบอร์ดของฉัน`;
+    memberBtn.addEventListener('click', () => { adminViewingUser = null; loadMemberDashboard(); });
+    mainMenuBar.appendChild(memberBtn);
+
+    // ปุ่มสุนัขจรจัด (ผู้ใช้ Login ก็แจ้งได้)
+    const strayBtn = document.createElement('button');
+    strayBtn.id = 'nav-stray-btn';
+    strayBtn.className = 'nav-button';
+    strayBtn.innerHTML = `<span class="icon">🐕</span> แจ้งสัตว์จรจัด`;
+    strayBtn.addEventListener('click', loadStrayPage);
+    mainMenuBar.appendChild(strayBtn);
+
+    if (userData.role === 'Admin') {
+      const adminBtn = document.createElement('button');
+      adminBtn.className = 'nav-button';
+      adminBtn.innerHTML = `<span class="icon">⚙️</span> จัดการแอดมิน`;
+      adminBtn.style.color = 'var(--col-royal)'; 
+      adminBtn.addEventListener('click', () => { adminViewingUser = null; loadAdminDashboard(); });
+      mainMenuBar.appendChild(adminBtn);
+    }
+    
+    const logoutButton = document.createElement('button');
+    logoutButton.id = 'nav-logout-btn';
+    logoutButton.className = 'nav-button';
+    logoutButton.innerHTML = `<span class="icon">🚪</span> ออกจากระบบ`;
+    logoutButton.addEventListener('click', handleLogout);
+    mainMenuBar.appendChild(logoutButton);
+  }
+
+  function updateNavForLogout() {
+    currentUser = null;
+    localStorage.removeItem('sessionToken'); 
+    mainMenuBar.innerHTML = ''; 
+    
+    const homeButton = document.createElement('button');
+    homeButton.id = 'nav-home-btn';
+    homeButton.className = 'nav-button';
+    homeButton.innerHTML = `<span class="icon">🏠</span> หน้าหลัก`;
+    homeButton.addEventListener('click', loadPublicDashboard);
+    mainMenuBar.appendChild(homeButton);
+    
+    // (ใหม่) ปุ่มสุนัขจรจัด สำหรับประชาชนทั่วไป
+    const strayBtn = document.createElement('button');
+    strayBtn.id = 'nav-stray-btn';
+    strayBtn.className = 'nav-button';
+    strayBtn.innerHTML = `<span class="icon">🐕</span> แจ้งสัตว์จรจัด`;
+    strayBtn.addEventListener('click', loadStrayPage);
+    mainMenuBar.appendChild(strayBtn);
+    
+    const loginButton = document.createElement('button');
+    loginButton.id = 'nav-login-btn';
+    loginButton.className = 'nav-button';
+    loginButton.innerHTML = `<span class="icon">🔑</span> เข้าสู่ระบบ/สมัครสมาชิก`;
+    loginButton.addEventListener('click', loadLoginPage);
+    mainMenuBar.appendChild(loginButton);
+  }
+
+  function handleLogout() {
+    showLoader(true);
+    google.script.run.doLogout(localStorage.getItem('sessionToken'));
+    adminViewingUser = null; 
+    updateNavForLogout();
+    loadPublicDashboard();
+  }
+</script>

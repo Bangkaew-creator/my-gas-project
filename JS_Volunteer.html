@@ -1,0 +1,144 @@
+<script>
+  function loadVolunteerDashboard() {
+    // ปิด Sidebar, เตรียมพื้นที่
+    toggleSidebar(false);
+    const pageId = 'volunteer-dashboard-page';
+    let pageDiv = document.getElementById(pageId);
+    
+    // ถ้ายังไม่มี div ให้สร้างใหม่ (หรือใช้ div กลาง)
+    if (!pageDiv) {
+       pageDiv = document.createElement('div');
+       pageDiv.id = pageId;
+       pageDiv.className = 'page';
+       document.getElementById('app-content').appendChild(pageDiv);
+    }
+
+    pageDiv.classList.add('page');
+    pageDiv.innerHTML = ""; // เคลียร์ของเก่า
+    showLoader(true);
+
+    const user = currentUser; // ดึงจาก Global Variable ที่ Login เข้ามา
+
+    google.script.run.withSuccessHandler(res => {
+      showLoader(false);
+      if (res.error) {
+        Swal.fire('Error', res.error, 'error');
+        return;
+      }
+
+      // --- สร้าง UI ---
+      let html = `
+        <h2 class="dashboard-title">
+           👮 แดชบอร์ดอาสาสมัคร (หมู่ที่ ${res.volunteerMoo})
+        </h2>
+        
+        <!-- Cards สรุปยอดในหมู่ -->
+        <div class="dashboard-grid" style="margin-bottom:20px;">
+           <div class="summary-card card-color-1">
+              <div class="card-title">บ้านในความดูแล</div>
+              <div class="card-value-main">${res.stats.households}</div>
+           </div>
+           <div class="summary-card card-color-4">
+              <div class="card-title">สัตว์เลี้ยงรวม</div>
+              <div class="card-value-main">${res.stats.total}</div>
+           </div>
+        </div>
+
+        <!-- ตารางรายชื่อ (เห็น ID แค่ 4 ตัวหลัง) -->
+        <div class="management-section">
+           <div class="section-header"><h3 class="section-title">รายชื่อครัวเรือนในหมู่ ${res.volunteerMoo}</h3></div>
+           <div class="table-responsive">
+             <table class="data-table">
+               <thead>
+                 <tr>
+                   <th>บ้านเลขที่</th>
+                   <th>เจ้าของ</th>
+                   <th>บัตร ปชช. (Masked)</th>
+                   <th>เบอร์โทร</th>
+                   <th>สัตว์เลี้ยง</th>
+                 </tr>
+               </thead>
+               <tbody>
+      `;
+
+      res.list.forEach(h => {
+         html += `
+           <tr>
+             <td>${h.houseNo}</td>
+             <td>${h.ownerName}</td>
+             <td style="color:#d32f2f; font-weight:bold;">${h.idCard}</td>
+             <td>${h.phone}</td>
+             <td>🐶 ${h.dogCount} | 🐈 ${h.catCount}</td>
+           </tr>
+         `;
+      });
+
+      html += `</tbody></table></div></div>`;
+      
+      pageDiv.innerHTML = html;
+      navigateTo(pageId);
+
+    }).getVolunteerDashboardData(user.householdKey);
+  }
+
+  // ✅ อัปเดตเมนูบาร์ให้รองรับ Volunteer (Override ฟังก์ชันเดิม)
+  function updateNavForLogin(userData) {
+    currentUser = userData;
+    mainMenuBar.innerHTML = ''; 
+
+    const welcomeText = document.createElement('div');
+    welcomeText.className = 'menu-welcome';
+    welcomeText.innerHTML = `สวัสดี, <b>${userData.name}</b>`;
+    welcomeText.style.marginRight = "10px";
+    mainMenuBar.appendChild(welcomeText);
+    
+    // ปุ่ม Dashboard ตามสิทธิ์
+    if (userData.role === 'Admin') {
+       const adminBtn = document.createElement('button');
+       adminBtn.className = 'nav-button';
+       adminBtn.innerHTML = `<span class="icon">⚙️</span> จัดการแอดมิน`;
+       adminBtn.style.color = 'var(--col-royal)'; 
+       adminBtn.addEventListener('click', () => { adminViewingUser = null; loadAdminDashboard(); });
+       mainMenuBar.appendChild(adminBtn);
+    } 
+    else if (userData.role === 'Volunteer') {
+       // ปุ่มสำหรับ Volunteer
+       const volBtn = document.createElement('button');
+       volBtn.className = 'nav-button';
+       volBtn.innerHTML = `<span class="icon">👮</span> ดูแลหมู่บ้าน`;
+       volBtn.addEventListener('click', () => { adminViewingUser = null; loadVolunteerDashboard(); });
+       mainMenuBar.appendChild(volBtn);
+       
+       // Volunteer อาจจะมีปุ่มดูบ้านตัวเองด้วยก็ได้ (ถ้าต้องการ)
+       const myHomeBtn = document.createElement('button');
+       myHomeBtn.className = 'nav-button';
+       myHomeBtn.innerHTML = `<span class="icon">🏠</span> บ้านของฉัน`;
+       myHomeBtn.addEventListener('click', () => { adminViewingUser = null; loadMemberDashboard(); });
+       mainMenuBar.appendChild(myHomeBtn);
+    }
+    else {
+       // Member ปกติ
+       const memberBtn = document.createElement('button');
+       memberBtn.className = 'nav-button';
+       memberBtn.innerHTML = `<span class="icon">🏠</span> แดชบอร์ดของฉัน`;
+       memberBtn.addEventListener('click', () => { adminViewingUser = null; loadMemberDashboard(); });
+       mainMenuBar.appendChild(memberBtn);
+    }
+
+    // ปุ่มสุนัขจรจัด (ทุกคนเห็น)
+    const strayBtn = document.createElement('button');
+    strayBtn.id = 'nav-stray-btn';
+    strayBtn.className = 'nav-button';
+    strayBtn.innerHTML = `<span class="icon">🐕</span> แจ้งสัตว์จรจัด`;
+    strayBtn.addEventListener('click', loadStrayPage);
+    mainMenuBar.appendChild(strayBtn);
+    
+    // ปุ่ม Logout
+    const logoutButton = document.createElement('button');
+    logoutButton.id = 'nav-logout-btn';
+    logoutButton.className = 'nav-button';
+    logoutButton.innerHTML = `<span class="icon">🚪</span> ออกจากระบบ`;
+    logoutButton.addEventListener('click', handleLogout);
+    mainMenuBar.appendChild(logoutButton);
+  }
+</script>

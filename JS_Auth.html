@@ -1,0 +1,216 @@
+<script>
+  function loadLoginPage() {
+    toggleSidebar(false); // (Step 19)
+    const pageId = 'login-page';
+    const pageDiv = document.getElementById(pageId);
+    if (!pageDiv) return;
+
+    pageDiv.classList.add('page');
+    
+    let mooOptions = '<option value="">-- เลือกหมู่ที่ --</option>';
+    for (let i = 1; i <= 16; i++) {
+      mooOptions += `<option value="${i}">${i}</option>`;
+    }
+    
+    let html = `
+      <div class="form-container">
+        <h2 class="form-title">เข้าสู่ระบบ</h2>
+        <div id="login-error" class="error-message"></div>
+        <form id="login-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="login-houseno">บ้านเลขที่</label>
+              <input type="text" id="login-houseno" class="form-input" required placeholder="เช่น 115/350">
+            </div>
+            <div class="form-group">
+              <label for="login-moo">หมู่ที่</label>
+              <select id="login-moo" class="form-input" required>
+                ${mooOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="login-pass">รหัสผ่าน</label>
+            <input type="password" id="login-pass" class="form-input" required>
+          </div>
+          <button type="submit" class="form-button">ตกลง</button>
+        </form>
+        <div id="goto-register" class="form-link">ยังไม่มีบัญชี? สมัครสมาชิกที่นี่</div>
+        
+        <div id="goto-forgot" class="form-link small">ลืมรหัสผ่าน?</div>
+      </div>
+    `;
+    pageDiv.innerHTML = html;
+    navigateTo(pageId); 
+    
+    document.getElementById('login-form').addEventListener('submit', handleLoginSubmit);
+    document.getElementById('goto-register').addEventListener('click', loadRegisterPage);
+    document.getElementById('goto-forgot').addEventListener('click', handleForgotPassword);
+    // (Step 17)
+  }
+
+  function handleLoginSubmit(event) {
+    event.preventDefault(); 
+    showLoader(true);
+    
+    const houseNo = document.getElementById('login-houseno').value;
+    const moo = document.getElementById('login-moo').value;
+    const key = houseNo + "-" + moo; 
+    const pass = document.getElementById('login-pass').value;
+    const errorDiv = document.getElementById('login-error');
+    errorDiv.style.display = 'none'; 
+    
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.success) {
+          localStorage.setItem('sessionToken', response.token); 
+          
+          // --- เปลี่ยนเป็น Toast ---
+          Toast.fire({
+            icon: 'success',
+            title: 'เข้าสู่ระบบสำเร็จ',
+            text: `ยินดีต้อนรับคุณ ${response.userData.name}`
+          });
+
+          // ทำงานต่อทันทีไม่ต้องรอ user กด OK
+          updateNavForLogin(response.userData);
+          if (response.userData.role === 'Admin') {
+            loadAdminDashboard();
+          } else {
+            loadMemberDashboard(); 
+          }
+          
+        } else {
+          errorDiv.textContent = response.message;
+          errorDiv.style.display = 'block';
+        }
+        showLoader(false);
+      })
+      .withFailureHandler(err => {
+        errorDiv.textContent = 'การเชื่อมต่อล้มเหลว: ' + err.message;
+        errorDiv.style.display = 'block';
+        showLoader(false);
+      })
+      .doLogin(key, pass);
+  }
+
+  function loadRegisterPage() {
+    toggleSidebar(false); // (Step 19)
+    const pageId = 'register-page';
+    const pageDiv = document.getElementById(pageId);
+    if (!pageDiv) return;
+
+    pageDiv.classList.add('page');
+    
+    let mooOptions = '<option value="">-- เลือกหมู่ที่ --</option>';
+    for (let i = 1; i <= 16; i++) {
+      mooOptions += `<option value="${i}">${i}</option>`;
+    }
+    
+    let html = `
+      <div class="form-container">
+        <h2 class="form-title">สมัครสมาชิก</h2>
+        <div id="register-error" class="error-message"></div>
+        <form id="register-form">
+          <div class="form-group">
+            <label for="reg-fullname">ชื่อ-นามสกุล (ผู้ให้ข้อมูล)</label>
+            <input type="text" id="reg-fullname" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label for="reg-phone">เบอร์โทรศัพท์</label>
+            <input type="tel" id="reg-phone" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label for="reg-idcard">หมายเลขบัตรประชาชน (ไม่บังคับ)</label>
+            <input type="text" id="reg-idcard" class="form-input">
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="reg-houseno">บ้านเลขที่</label>
+              <input type="text" id="reg-houseno" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="reg-moo">หมู่ที่</label>
+              <select id="reg-moo" class="form-input" required>
+                ${mooOptions}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="reg-pass">รหัสผ่าน</label>
+            <input type="password" id="reg-pass" class="form-input" required>
+          </div>
+          <button type="submit" class="form-button">สมัครสมาชิก</button>
+        </form>
+        <div id="goto-login" class="form-link">มีบัญชีอยู่แล้ว? กลับไปล็อกอิน</div>
+      </div>
+    `;
+    
+    pageDiv.innerHTML = html;
+    navigateTo(pageId); 
+    
+    document.getElementById('register-form').addEventListener('submit', handleRegisterSubmit);
+    document.getElementById('goto-login').addEventListener('click', loadLoginPage);
+  }
+
+  function handleRegisterSubmit(event) {
+    event.preventDefault();
+    showLoader(true);
+    
+    const errorDiv = document.getElementById('register-error');
+    errorDiv.style.display = 'none';
+    const formData = {
+      fullName: document.getElementById('reg-fullname').value,
+      phone: document.getElementById('reg-phone').value,
+      idCard: document.getElementById('reg-idcard').value,
+      houseNo: document.getElementById('reg-houseno').value,
+      moo: document.getElementById('reg-moo').value,
+      password: document.getElementById('reg-pass').value
+    };
+    if (!formData.fullName || !formData.phone || !formData.houseNo || !formData.moo || !formData.password) {
+      errorDiv.textContent = 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน (ยกเว้นหมายเลขบัตรประชาชน)';
+      errorDiv.style.display = 'block';
+      showLoader(false);
+      return; 
+    }
+    
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.success) {
+          // --- เปลี่ยนเป็น Toast ---
+          Toast.fire({
+            icon: 'success',
+            title: (response.action === "created") ? 'สร้างบัญชีใหม่สำเร็จ!' : 'เปิดใช้งานบัญชีสำเร็จ!',
+            text: 'กรุณาเข้าสู่ระบบด้วยบ้านเลขที่และหมู่ที่ของคุณ'
+          });
+          
+          // ย้ายหน้าทันที
+          loadLoginPage(); 
+          
+        } else {
+          errorDiv.textContent = response.message;
+          errorDiv.style.display = 'block';
+        }
+        showLoader(false);
+      })
+      .withFailureHandler(err => {
+        errorDiv.textContent = 'การเชื่อมต่อล้มเหลว: ' + err.message;
+        errorDiv.style.display = 'block';
+        showLoader(false);
+      })
+      .doRegister(formData);
+  }
+
+  /**
+   * (Step 17) จัดการปุ่ม "ลืมรหัสผ่าน"
+   * อันนี้คงไว้แบบ Modal เพราะข้อมูลยาวและสำคัญ
+   */
+  function handleForgotPassword() {
+    Swal.fire({
+      title: 'ลืมรหัสผ่าน',
+      html: 'กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อทำการตั้งรหัสผ่านใหม่<br><br><b>เบอร์โทร: [063-846-7741]</b>', // ⬅️ ใส่เบอร์โทรจริงที่นี่
+      icon: 'info',
+      confirmButtonText: 'ตกลง'
+    });
+  }
+</script>

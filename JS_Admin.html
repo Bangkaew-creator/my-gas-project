@@ -1,0 +1,545 @@
+<script>
+  // ตัวแปรเช็คสถานะการโหลด Dashboard
+  var isDashboardLoaded = false;
+
+  /**
+   * --- ฟังก์ชันหลัก: โหลดหน้า Admin Dashboard ---
+   */
+  function loadAdminDashboard() {
+    toggleSidebar(false);
+    const pageId = 'admin-dashboard-page';
+    const pageDiv = document.getElementById(pageId);
+    
+    if (!pageDiv || !currentUser || currentUser.role !== 'Admin') {
+      loadMemberDashboard();
+      return;
+    }
+    
+    pageDiv.classList.add('page');
+    isDashboardLoaded = false; 
+    
+    let mooOptions = '<option value="">-- เลือกหมู่ --</option>';
+    for (let i = 1; i <= 16; i++) {
+      mooOptions += `<option value="${i}">${i}</option>`;
+    }
+
+    let html = `
+      <style>
+        .admin-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; flex-wrap: wrap; }
+        .tab-btn { background: #f8f9fa; border: 1px solid #ddd; padding: 10px 20px; font-size: 16px; cursor: pointer; color: #555; font-weight: bold; border-radius: 8px; transition: 0.3s; flex: 1; text-align: center; }
+        .tab-btn.active { background-color: #e3f2fd; color: #1976d2; border-color: #1976d2; }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        .search-box-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; max-width: 600px; margin: 20px auto; border: 1px solid #eee; }
+        .status-alert { padding: 20px; border-radius: 8px; margin-top: 15px; text-align: center; }
+        .status-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .btn-action-group { margin-top: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      </style>
+
+      <h2 class="dashboard-title">ผู้ดูแลระบบ (Admin Control)</h2>
+
+      <div class="admin-tabs">
+        <button class="tab-btn active" onclick="switchAdminTab('search')">🔍 ค้นหา/จัดการรายตัว</button>
+        <button class="tab-btn" onclick="switchAdminTab('dashboard')">📊 ภาพรวม & รายชื่อทั้งหมด</button>
+      </div>
+
+      <!-- TAB 1: ค้นหาด่วน -->
+      <div id="tab-search" class="tab-content active">
+        <div class="search-box-card">
+          <h3 style="margin-bottom: 20px; color: #333;">ตรวจสอบข้อมูลครัวเรือน</h3>
+          <form id="quick-search-form" style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+             <div style="flex: 1; min-width: 140px;">
+               <input type="text" id="qs-house" class="form-input" placeholder="บ้านเลขที่ (เช่น 88/1)" required style="margin:0;">
+             </div>
+             <div style="flex: 1; min-width: 120px;">
+               <select id="qs-moo" class="form-input" required style="margin:0;">
+                 ${mooOptions}
+               </select>
+             </div>
+             <button type="submit" class="form-button" style="width: auto; min-width: 100px; margin:0;">🔍 ตรวจสอบ</button>
+          </form>
+
+          <div id="qs-result" style="margin-top: 20px; text-align: left;"></div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Dashboard -->
+      <div id="tab-dashboard" class="tab-content">
+        <div class="management-section" style="padding-bottom: 5px;">
+           <form id="admin-filter-form" class="admin-filter-bar">
+             <div class="form-group">
+               <label>ค้นหาจากหมู่</label>
+               <select id="admin-filter-moo" class="form-input">
+                 <option value="">-- ทุกหมู่ --</option>
+                 ${Array.from({length: 16}, (_, i) => `<option value="${i+1}">หมู่ ${i+1}</option>`).join('')}
+               </select>
+             </div>
+             <div class="form-group">
+               <label>ค้นหาจากบ้านเลขที่</label>
+               <input type="text" id="admin-filter-house" class="form-input" placeholder="เช่น 93/7">
+             </div>
+             <button type="submit" class="form-button">ค้นหา</button>
+           </form>
+        </div>
+
+        <div id="admin-card-container"><p style="text-align:center; color:#888;">กดโหลดข้อมูลเพื่อแสดงผล...</p></div>
+
+        <div class="management-section">
+          <div class="section-header">
+            <h3 class="section-title">ตารางข้อมูลครัวเรือน</h3>
+            <button id="admin-add-household-btn" class="form-button success" style="width: auto;">➕ เพิ่มครัวเรือนใหม่</button>
+          </div>
+          <div id="admin-table-container" class="data-table-wrapper">
+             <div style="text-align: center; padding: 40px; color: #aaa;">
+               <i class="fas fa-list" style="font-size: 48px; margin-bottom: 10px;"></i><br>
+               ข้อมูลจะแสดงเมื่อโหลดเสร็จสิ้น
+             </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    pageDiv.innerHTML = html;
+    navigateTo(pageId);
+    
+    document.getElementById('quick-search-form').addEventListener('submit', handleQuickSearch);
+    document.getElementById('admin-filter-form').addEventListener('submit', handleAdminFilter);
+    document.getElementById('admin-add-household-btn').addEventListener('click', openAdminAddHouseholdModal);
+    
+    showLoader(false);
+  }
+
+  function switchAdminTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.currentTarget.classList.add('active'); 
+    document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+
+    if (tabName === 'dashboard' && !isDashboardLoaded) {
+      loadAdminData(null, null);
+    }
+  }
+
+  // --- TAB 1: Quick Search Logic ---
+  function handleQuickSearch(e) {
+    e.preventDefault();
+    const house = document.getElementById('qs-house').value;
+    const moo = document.getElementById('qs-moo').value;
+    const resultDiv = document.getElementById('qs-result');
+
+    resultDiv.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner-border text-primary"></div> กำลังตรวจสอบ...</div>';
+
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res.found) {
+          // ✅ เพิ่มปุ่มลบ (สีแดง)
+          resultDiv.innerHTML = `
+            <div class="status-alert status-success">
+              <h4>✅ พบข้อมูลแล้ว</h4>
+              <p>บ้านเลขที่ <b>${house}</b> หมู่ <b>${moo}</b> <br><small>(${res.name || 'ไม่ระบุชื่อ'})</small></p>
+              
+              <div class="btn-action-group">
+                <button class="form-button" onclick="fetchAndEditDirectly('${res.key}')">✏️ แก้ไข</button>
+                <button class="form-button" onclick="viewPetsDirectly('${res.key}', '${house}')">🐶 สัตว์เลี้ยง</button>
+                <button class="form-button danger" onclick="confirmDeleteDirectly('${res.key}', '${res.name}', '${house}')">🗑️ ลบ</button>
+              </div>
+            </div>
+          `;
+        } else {
+          resultDiv.innerHTML = `
+            <div class="status-alert status-warning">
+              <h4>❌ ยังไม่พบข้อมูล</h4>
+              <p>บ้านเลขที่ <b>${house}</b> หมู่ <b>${moo}</b> ยังไม่ได้ลงทะเบียน</p>
+              <button class="form-button success" style="margin-top:10px;" onclick="openAdminAddHouseholdModalPrefill('${house}', '${moo}')">➕ ลงทะเบียนบ้านใหม่เดี๋ยวนี้</button>
+            </div>
+          `;
+        }
+      })
+      .adminSearchHousehold(house, moo); 
+  }
+
+  // ฟังก์ชันลบ (ใช้ร่วมกันได้)
+  function confirmDeleteDirectly(key, name, house) {
+    Swal.fire({
+      title: 'ยืนยันการลบ?',
+      html: `คุณต้องการลบข้อมูลบ้านเลขที่ <b>${house}</b> <br>ของ <b>คุณ${name || '-'}</b> ใช่หรือไม่?<br><br><span style="color:red; font-size:0.9em;">⚠️ ข้อมูลสัตว์เลี้ยงทั้งหมดจะหายไปกู้คืนไม่ได้</span>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#ccc',
+      confirmButtonText: 'ยืนยันลบ',
+      cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        showLoader(true);
+        google.script.run
+          .withSuccessHandler(response => {
+            showLoader(false);
+            if (response.success) {
+              Swal.fire('ลบสำเร็จ', 'ข้อมูลถูกลบเรียบร้อยแล้ว', 'success');
+              // เคลียร์ผลการค้นหา
+              if(document.getElementById('qs-result')) document.getElementById('qs-result').innerHTML = '';
+              // รีโหลด Dashboard ถ้าเปิดอยู่
+              if(isDashboardLoaded) loadAdminData(null, null);
+            } else {
+              Swal.fire('เกิดข้อผิดพลาด', response.message, 'error');
+            }
+          })
+          .withFailureHandler(err => {
+            showLoader(false);
+            Swal.fire('Error', err.message, 'error');
+          })
+          .adminDeleteHousehold(key);
+      }
+    });
+  }
+
+  function fetchAndEditDirectly(key) {
+    showLoader(true);
+    google.script.run
+      .withSuccessHandler(res => {
+        showLoader(false);
+        if (res.success) {
+          openAdminEditModal(key, res.data);
+        } else {
+          Swal.fire('Error', res.message, 'error');
+        }
+      })
+      .withFailureHandler(err => {
+        showLoader(false);
+        Swal.fire('Error', err.message, 'error');
+      })
+      .getMemberDetailsForKey(key);
+  }
+  
+  function viewPetsDirectly(key, houseName) {
+      adminViewingUser = { householdKey: key, name: "Admin View (" + houseName + ")", role: 'Member' };
+      loadMemberDashboard();
+  }
+
+  function openAdminAddHouseholdModalPrefill(house, moo) {
+    openAdminAddHouseholdModal();
+    setTimeout(() => {
+      document.getElementById('admin-add-house').value = house;
+      document.getElementById('admin-add-moo').value = moo;
+    }, 100);
+  }
+
+
+  // --- TAB 2: Dashboard Logic ---
+  
+  function loadAdminData(moo, houseNo) {
+    showLoader(true);
+    document.getElementById('admin-card-container').innerHTML = '<p style="text-align:center;">กำลังประมวลผลข้อมูล...</p>';
+    google.script.run
+      .withSuccessHandler(response => {
+        if (!response || !response.success) {
+          document.getElementById('admin-card-container').innerHTML = `<p class="error-message">${response ? response.error : 'Error'}</p>`;
+          showLoader(false);
+          return;
+        }
+        renderAdminCards(response.cardData);
+        renderAdminTable(response.tableData);
+        isDashboardLoaded = true;
+        showLoader(false);
+      })
+      .withFailureHandler(err => {
+         document.getElementById('admin-card-container').innerHTML = `<p class="error-message">${err.message}</p>`;
+         showLoader(false);
+      })
+      .getAdminDashboardData(moo, houseNo);
+  }
+  
+  function handleAdminFilter(event) {
+    event.preventDefault();
+    const moo = document.getElementById('admin-filter-moo').value;
+    const houseNo = document.getElementById('admin-filter-house').value;
+    loadAdminData(moo, houseNo);
+  }
+  
+  function renderAdminCards(data) {
+    const container = document.getElementById('admin-card-container');
+    let html = `<div class="dashboard-grid">`;
+    html += `<div class="summary-card card-color-1"><div class="card-title">จำนวนครัวเรือน</div><div class="card-value-main">${data.households.toLocaleString()} <span class="unit">ครัวเรือน</span></div></div>`;
+    html += `<div class="summary-card card-color-2"><div class="card-title">สุนัขทั้งหมด</div><div class="card-value-main">${data.dogActual.toLocaleString()} <span class="unit">ตัว</span></div></div>`;
+    html += `<div class="summary-card card-color-3"><div class="card-title">แมวทั้งหมด</div><div class="card-value-main">${data.catActual.toLocaleString()} <span class="unit">ตัว</span></div></div>`;
+    html += `<div class="summary-card card-color-4"><div class="card-title">รวมสัตว์เลี้ยง</div><div class="card-value-main">${data.totalActual.toLocaleString()} <span class="unit">ตัว</span></div></div>`;
+    html += `<div class="summary-card card-color-5"><div class="card-title">ฉีดวัคซีนแล้ว</div><div class="card-value-main">${data.vaccinated.toLocaleString()} <span class="unit">ตัว</span></div></div>`;
+    html += `<div class="summary-card card-color-6"><div class="card-title">ทำหมันแล้ว</div><div class="card-value-main">${data.neutered.toLocaleString()} <span class="unit">ตัว</span></div></div>`;
+    html += `</div>`;
+    container.innerHTML = html;
+  }
+  
+  function renderAdminTable(households) {
+    const container = document.getElementById('admin-table-container');
+    if (!households || households.length === 0) {
+      container.innerHTML = '<p style="text-align:center; padding: 20px; color:#888;">ไม่พบข้อมูลครัวเรือนที่ตรงกับเงื่อนไข</p>';
+      return;
+    }
+    let html = '<table class="data-table"><thead><tr><th>HouseholdKey</th><th>หมู่</th><th>บ้านเลขที่</th><th>ผู้ให้ข้อมูล</th><th>เบอร์โทรศัพท์</th><th>จัดการ</th></tr></thead><tbody>';
+    households.forEach(row => {
+      const key = row[0] || (row[2] + "-" + row[1]); 
+      const name = row[3] || '-';
+      const displayKey = row[0] || '-';
+      const phone = row[5] || '';
+      const idCard = row[4] || ''; 
+      html += `<tr><td>${displayKey}</td><td>${row[1]}</td><td>${row[2]}</td><td>${name}</td><td>${phone}</td><td><button class="icon-button edit-btn" data-key="${key}" data-name="${name}" data-phone="${phone}" data-idcard="${idCard}" title="แก้ไขข้อมูล">✏️</button><button class="icon-button view-pets-btn" data-key="${key}" data-name="${name}" title="ดูสัตว์เลี้ยง">👁️</button><button class="icon-button reset-pass-btn" data-key="${key}" data-house="${row[2]}" title="รีเซ็ตรหัสผ่าน">🔑</button><button class="icon-button delete-btn" data-key="${key}" data-name="${name}" data-house="${row[2]}" title="ลบข้อมูล">🗑️</button></td></tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+    
+    // Attach Listeners
+    container.querySelectorAll('.view-pets-btn').forEach(btn => btn.addEventListener('click', handleAdminViewPets));
+    container.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', handleAdminEditMember));
+    // ปุ่มลบในตารางก็เรียก confirmDeleteDirectly ได้
+    container.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+         const key = e.currentTarget.dataset.key;
+         const name = e.currentTarget.dataset.name;
+         const house = e.currentTarget.dataset.house;
+         confirmDeleteDirectly(key, name, house);
+      });
+    });
+    container.querySelectorAll('.reset-pass-btn').forEach(btn => btn.addEventListener('click', handleAdminResetPassword));
+  }
+  
+  // --- Modals & Handlers ---
+  
+  function handleAdminViewPets(event) {
+    const key = event.currentTarget.dataset.key;
+    const name = event.currentTarget.dataset.name;
+    viewPetsDirectly(key, name);
+  }
+  
+  function handleAdminEditMember(event) {
+    const key = event.currentTarget.dataset.key;
+    const currentData = {
+      fullName: event.currentTarget.dataset.name,
+      phone: (event.currentTarget.dataset.phone || '').replace(/'/g, ''), 
+      idCard: (event.currentTarget.dataset.idcard || '').replace(/'/g, '') 
+    };
+    openAdminEditModal(key, currentData);
+  }
+
+  function openAdminEditModal(householdKey, currentData) {
+    let html = `
+      <div class="modal-overlay-close"></div>
+      <div class="modal-content" style="max-width: 500px;">
+        <h2 class="form-title">แก้ไขข้อมูลครัวเรือน</h2>
+        <p style="text-align:center; margin-top:-20px; margin-bottom: 20px; color:#666;">(ID: ${householdKey})</p>
+        <div id="admin-edit-error" class="error-message"></div>
+        <form id="admin-edit-form">
+          <div class="form-group">
+            <label>ชื่อ-นามสกุล (ผู้ให้ข้อมูล)</label>
+            <input type="text" id="admin-edit-name" class="form-input" required value="${currentData.fullName || ''}" placeholder="ระบุชื่อเจ้าของ">
+          </div>
+          <div class="form-group">
+            <label>เบอร์โทรศัพท์</label>
+            <input type="tel" id="admin-edit-phone" class="form-input" required value="${currentData.phone || ''}" placeholder="0xx-xxx-xxxx">
+          </div>
+          <div class="form-group">
+            <label>หมายเลขบัตรประชาชน (ไม่บังคับ)</label>
+            <input type="text" id="admin-edit-idcard" class="form-input" value="${currentData.idCard || ''}" placeholder="13 หลัก">
+          </div>
+          <button type="submit" class="form-button">บันทึกและไปต่อ ➡️</button>
+        </form>
+      </div>
+    `;
+    modalContainer.innerHTML = html;
+    modalContainer.style.display = 'flex';
+    
+    modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
+    document.getElementById('admin-edit-form').addEventListener('submit', (e) => handleAdminEditSubmit(e, householdKey));
+  }
+
+  // กดบันทึกแล้วเด้งไปหน้าดูสัตว์เลี้ยงทันที
+  function handleAdminEditSubmit(event, householdKey) {
+    event.preventDefault();
+    showLoader(true);
+    const errorDiv = document.getElementById('admin-edit-error');
+    errorDiv.style.display = 'none';
+
+    const memberData = {
+      fullName: document.getElementById('admin-edit-name').value,
+      phone: document.getElementById('admin-edit-phone').value,
+      idCard: document.getElementById('admin-edit-idcard').value
+    };
+
+    if (!memberData.fullName || !memberData.phone) {
+      errorDiv.textContent = 'กรุณากรอกชื่อและเบอร์โทรศัพท์';
+      errorDiv.style.display = 'block';
+      showLoader(false);
+      return;
+    }
+    
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.success) {
+          closePetModal();
+          showLoader(false);
+          const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
+          Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' });
+          
+          viewPetsDirectly(householdKey, memberData.fullName);
+
+        } else {
+          errorDiv.textContent = response.message;
+          errorDiv.style.display = 'block';
+          showLoader(false);
+        }
+      })
+      .withFailureHandler(err => {
+        errorDiv.textContent = err.message;
+        errorDiv.style.display = 'block';
+        showLoader(false);
+      })
+      .adminUpdateMemberDetails(householdKey, memberData);
+  }
+  
+  // (ฟังก์ชัน handleAdminDeleteHousehold เดิม ถูกแทนที่ด้วย confirmDeleteDirectly แล้ว)
+  // แต่คงไว้กัน error ถ้ามีตัวเรียกเก่า
+  function handleAdminDeleteHousehold(event) {
+     const key = event.currentTarget.dataset.key;
+     const name = event.currentTarget.dataset.name;
+     const house = event.currentTarget.dataset.house;
+     confirmDeleteDirectly(key, name, house);
+  }
+
+  function handleAdminResetPassword(event) {
+    const key = event.currentTarget.dataset.key;
+    const house = event.currentTarget.dataset.house;
+    openAdminResetModal(key, house);
+  }
+
+  function openAdminResetModal(householdKey, house) {
+    let html = `
+      <div class="modal-overlay-close"></div>
+      <div class="modal-content" style="max-width: 500px;">
+        <h2 class="form-title">รีเซ็ตรหัสผ่าน</h2>
+        <p style="text-align:center; color:#666;">(บ้าน: ${house})</p>
+        <div id="admin-reset-error" class="error-message"></div>
+        <form id="admin-reset-form">
+          <div class="form-group">
+            <label>รหัสผ่านใหม่</label>
+            <input type="password" id="admin-reset-pass1" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label>ยืนยันรหัสผ่านใหม่</label>
+            <input type="password" id="admin-reset-pass2" class="form-input" required>
+          </div>
+          <button type="submit" class="form-button">บันทึกรหัสผ่านใหม่</button>
+        </form>
+      </div>
+    `;
+    modalContainer.innerHTML = html;
+    modalContainer.style.display = 'flex';
+    modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
+    document.getElementById('admin-reset-form').addEventListener('submit', (e) => handleAdminResetSubmit(e, householdKey));
+  }
+
+  function handleAdminResetSubmit(event, householdKey) {
+    event.preventDefault();
+    showLoader(true);
+    const errorDiv = document.getElementById('admin-reset-error');
+    errorDiv.style.display = 'none';
+    const pass1 = document.getElementById('admin-reset-pass1').value;
+    const pass2 = document.getElementById('admin-reset-pass2').value;
+    if (pass1 !== pass2) {
+      errorDiv.textContent = 'รหัสผ่านไม่ตรงกัน';
+      errorDiv.style.display = 'block';
+      showLoader(false);
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.success) {
+          closePetModal();
+          showLoader(false);
+          Swal.fire({ icon: 'success', title: 'รีเซ็ตรหัสผ่านสำเร็จ' });
+        } else {
+          errorDiv.textContent = response.message;
+          errorDiv.style.display = 'block';
+          showLoader(false);
+        }
+      })
+      .withFailureHandler(err => {
+        errorDiv.textContent = err.message;
+        errorDiv.style.display = 'block';
+        showLoader(false);
+      })
+      .adminResetPassword(householdKey, pass1);
+  }
+  
+  function openAdminAddHouseholdModal() {
+    let mooOptions = '<option value="">-- เลือกหมู่ที่ --</option>';
+    for (let i = 1; i <= 16; i++) {
+      mooOptions += `<option value="${i}">${i}</option>`;
+    }
+    let html = `
+      <div class="modal-overlay-close"></div>
+      <div class="modal-content" style="max-width: 500px;">
+        <h2 class="form-title">เพิ่มครัวเรือนใหม่</h2>
+        <p style="text-align:center; color:#666; margin-top:-10px; margin-bottom:20px;">(ลงทะเบียนบ้านว่าง)</p>
+        <div id="admin-add-error" class="error-message"></div>
+        <form id="admin-add-form">
+          <div class="form-group">
+            <label>บ้านเลขที่</label>
+            <input type="text" id="admin-add-house" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label>หมู่ที่</label>
+            <select id="admin-add-moo" class="form-input" required>
+              ${mooOptions}
+            </select>
+          </div>
+          <button type="submit" class="form-button success">สร้างครัวเรือน</button>
+        </form>
+      </div>
+    `;
+    modalContainer.innerHTML = html;
+    modalContainer.style.display = 'flex';
+    modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
+    document.getElementById('admin-add-form').addEventListener('submit', handleAdminAddHouseholdSubmit);
+  }
+
+  // กดสร้างแล้วเด้งไปหน้าแก้ไขข้อมูลทันที
+  function handleAdminAddHouseholdSubmit(event) {
+    event.preventDefault();
+    showLoader(true);
+    const errorDiv = document.getElementById('admin-add-error');
+    errorDiv.style.display = 'none';
+    const houseNo = document.getElementById('admin-add-house').value;
+    const moo = document.getElementById('admin-add-moo').value;
+    
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.success) {
+          closePetModal();
+          const newKey = houseNo + "-" + moo;
+          
+          const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
+          Toast.fire({ icon: 'success', title: 'สร้างสำเร็จ', text: 'กำลังไปหน้าแก้ไขข้อมูล...' });
+          
+          openAdminEditModal(newKey, { fullName: '', phone: '', idCard: '' });
+          
+          if(document.getElementById('qs-result')) {
+             document.getElementById('qs-result').innerHTML = '';
+             document.getElementById('qs-house').value = houseNo;
+             document.getElementById('qs-moo').value = moo;
+          }
+          showLoader(false);
+        } else {
+          errorDiv.textContent = response.message;
+          errorDiv.style.display = 'block';
+          showLoader(false);
+        }
+      })
+      .withFailureHandler(err => {
+        errorDiv.textContent = err.message;
+        errorDiv.style.display = 'block';
+        showLoader(false);
+      })
+      .adminCreateHousehold(houseNo, moo);
+  }
+</script>

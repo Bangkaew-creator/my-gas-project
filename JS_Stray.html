@@ -1,0 +1,468 @@
+<script>
+  // ประกาศตัวแปร Global
+  var tempAnimalsList = [];
+  var currentLocation = { lat: '', lng: '', mapLink: '' };
+  var allStrayData = []; 
+  var strayMap = null; 
+  var strayMarkers = []; 
+  var selectMap = null;
+  var selectMarker = null;
+  var editingTempIndex = -1; 
+
+  // --- 1. Load Page Function ---
+  function loadStrayPage() {
+    toggleSidebar(false); 
+    const pageId = 'stray-page';
+    let pageDiv = document.getElementById(pageId);
+    if (!pageDiv) {
+      pageDiv = document.createElement('div');
+      pageDiv.id = pageId;
+      pageDiv.className = 'page';
+      document.getElementById('app-content').appendChild(pageDiv);
+    }
+    
+    let html = `
+      <style>
+        .stray-tabs { display: flex; gap: 15px; margin-bottom: 25px; justify-content: center; }
+        .stray-tab-btn { flex: 1; max-width: 200px; padding: 12px 20px; border: 2px solid var(--col-thistle); background: white; border-radius: 30px; font-family: 'Kanit', sans-serif; font-size: 16px; color: var(--col-hawthorne); cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .stray-tab-btn:hover { background-color: #F9F7F5; transform: translateY(-2px); }
+        .stray-tab-btn.active { background: var(--col-hawthorne); color: white; border-color: var(--col-hawthorne); box-shadow: 0 4px 10px rgba(40, 61, 59, 0.3); }
+        .stray-header-container { text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, var(--col-hawthorne) 0%, var(--col-blue-noir) 100%); border-radius: 12px; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .stray-header-title { font-family: 'Kanit', sans-serif; font-size: 28px; font-weight: 500; margin-bottom: 5px; color: #D9BCAF; }
+        .stray-search-box { width: 100%; padding: 15px 20px 15px 50px; border: 1px solid #DDD; border-radius: 12px; font-family: 'Kanit', sans-serif; font-size: 16px; outline: none; background: white; transition: all 0.3s; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .stray-search-box:focus { border-color: var(--col-royal); box-shadow: 0 0 0 4px rgba(121, 86, 99, 0.1); }
+        .search-wrapper { position: relative; margin-bottom: 20px; }
+        .search-icon-overlay { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-size: 20px; color: var(--col-thistle); }
+        .stray-group-card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; overflow: hidden; border: none; transition: transform 0.2s; }
+        .stray-group-header { padding: 15px 20px; background: linear-gradient(to right, #F9F7F5, #FFFFFF); border-left: 6px solid var(--col-royal); cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+        .stray-group-header:hover { background: #F0F0F0; }
+        .stray-group-body { display: none; }
+        .stray-group-body.expanded { display: block; border-top: 1px solid #EEE; animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .stray-item-row { padding: 15px 20px; border-bottom: 1px solid #EEE; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .stray-item-row:last-child { border-bottom: none; }
+        .stat-badge { font-size: 13px; padding: 3px 8px; border-radius: 6px; margin-right: 5px; display: inline-block; color: white; font-weight: 300; }
+        .bg-gray { background: #9E9E9E; } .bg-green { background: var(--color-green); } .bg-red { background: var(--col-royal); } .bg-orange { background: #D4A373; } .bg-blue { background: var(--col-hawthorne); }
+        #stray-select-map { height: 300px; width: 100%; border-radius: 12px; border: 2px solid var(--col-thistle); margin-top: 15px; margin-bottom: 10px; display: none; }
+        .select-map-active #stray-select-map { display: block; }
+      </style>
+
+      <div style="max-width: 800px; margin: 0 auto;">
+        <div class="stray-header-container">
+           <div class="stray-header-title">🐕🐈 ระบบข้อมูลสัตว์จรจัด</div>
+           <div style="font-size:16px; opacity:0.9; font-family:'Sarabun',sans-serif;">ร่วมกันดูแลเพื่อชุมชนที่น่าอยู่</div>
+        </div>
+        <div class="stray-tabs">
+          <button class="stray-tab-btn active" onclick="switchStrayTab('view')"><span>🗺️</span> แผนที่ & ข้อมูล</button>
+          <button class="stray-tab-btn" onclick="switchStrayTab('add')"><span>📝</span> แจ้งข้อมูลใหม่</button>
+        </div>
+
+        <!-- TAB 1: VIEW -->
+        <div id="tab-stray-view" style="display:block;">
+           <div id="stray-map" style="height:450px; width:100%; border-radius:12px; z-index:1; border:4px solid white; box-shadow:0 4px 15px rgba(0,0,0,0.1);"></div>
+           <div class="map-controls" style="margin-top:15px; border:1px solid #eee;">
+             <strong style="color:var(--col-hawthorne);">แสดงผลตาม:</strong>
+             <label class="radio-btn" style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="map-mode" value="neuter" onchange="updateMapMarkers()"> การทำหมัน</label>
+             <label class="radio-btn" style="cursor:pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="map-mode" value="behavior" checked onchange="updateMapMarkers()"> พฤติกรรม</label>
+             <div style="margin-left:auto; display:flex; gap:10px; font-size:14px; flex-wrap:wrap;">
+               <div id="legend-neuter" style="display:none;"><span class="dot pin-neuter-done"></span> ทำแล้ว <span class="dot pin-neuter-not"></span> ยัง <span class="dot pin-neuter-unknown"></span> ไม่ทราบ</div>
+               <div id="legend-behavior"><span class="dot pin-behav-friendly"></span> เป็นมิตร <span class="dot pin-behav-feeder"></span> เชื่อง <span class="dot pin-behav-danger"></span> ดุ</div>
+             </div>
+           </div>
+           <div class="search-wrapper">
+             <span class="search-icon-overlay">🔍</span>
+             <input type="text" id="stray-search-input" class="stray-search-box" placeholder="ค้นหาจากสถานที่, สี, หรือลักษณะ..." onkeyup="filterStrayList()">
+           </div>
+           <div id="public-stray-feed"><div style="text-align:center; padding:40px; color:#999;">กำลังโหลด...</div></div>
+        </div>
+
+        <!-- TAB 2: ADD -->
+        <div id="tab-stray-add" style="display:none;">
+          <div class="form-container" style="max-width: 100%; border-top:none; box-shadow:none; padding:20px; background:transparent;">
+            <p style="text-align:center; color:#795663; margin-bottom:20px; background:#fff; padding:15px; border-radius:12px; font-family:'Sarabun', sans-serif; border:1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">⚠️ <b>คำแนะนำ:</b> กรุณาตรวจสอบในแผนที่ก่อนบันทึก</p>
+            <div class="management-section" style="margin-top:0;">
+              <div class="section-header"><h3 class="section-title">1. ผู้แจ้งและสถานที่</h3></div>
+              <div class="form-grid">
+                 <div class="form-group"><label>ชื่อ-นามสกุล (ผู้ดูแล)</label><input type="text" id="stray-feeder-name" class="form-input" placeholder="ระบุชื่อจริง"></div>
+                 <div class="form-group"><label>เบอร์โทรศัพท์</label><input type="tel" id="stray-feeder-phone" class="form-input" placeholder="0xx-xxx-xxxx"></div>
+              </div>
+              <div class="form-group">
+                 <label>พิกัด/สถานที่พบเจอ <span style="color:red">*</span></label>
+                 <div style="display:flex; gap:10px; margin-bottom:10px;">
+                   <button type="button" class="form-button location-btn" onclick="getCurrentLocation()" style="flex:1;">📍 ดึงพิกัดปัจจุบัน</button>
+                   <button type="button" class="form-button secondary" onclick="toggleSelectMap()" style="flex:1;">🗺️ เลือกจากแผนที่</button>
+                 </div>
+                 <div id="stray-select-map"></div>
+                 <input type="text" id="stray-lat-lng" class="form-input" placeholder="Lat, Long" readonly style="width: 100%; background:#eee; margin-bottom:10px;">
+                 <input type="text" id="stray-location-desc" class="form-input" placeholder="ระบุจุดสังเกต...">
+                 <input type="hidden" id="stray-map-link">
+              </div>
+            </div>
+
+            <div class="management-section">
+              <div class="section-header"><h3 class="section-title">2. ข้อมูลสัตว์ (เพิ่มได้หลายตัว)</h3></div>
+              <div id="stray-animal-form-box" style="background:#F9F7F5; padding:20px; border-radius:12px; border:1px dashed #8A9688;">
+                 
+                 <!-- ✅ ส่วนเพิ่มรูปภาพสัตว์จรจัด -->
+                 <div style="text-align:center; margin-bottom:15px;">
+                    <div style="position:relative; display:inline-block;">
+                       <img id="stray-preview-image" src="https://via.placeholder.com/150?text=No+Image" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:2px solid #eee;">
+                       <div style="margin-top:5px;">
+                         <label for="stray-image-input" class="form-button secondary" style="width:auto; display:inline-block; cursor:pointer; font-size:12px; padding: 4px 10px;">📷 เพิ่มรูป</label>
+                         <input type="file" id="stray-image-input" accept="image/*" style="display:none;" onchange="handleStrayImageSelect(this)">
+                         <input type="hidden" id="stray-image-base64">
+                       </div>
+                    </div>
+                 </div>
+
+                 <div class="form-grid-4col">
+                    <div class="form-group" style="margin-bottom:5px;"><label>ประเภท</label><select id="temp-animal-type" class="form-input"><option value="สุนัข">🐕 สุนัข</option><option value="แมว">🐈 แมว</option></select></div>
+                    <div class="form-group" style="margin-bottom:5px;"><label>สี/ตำหนิ</label><input type="text" id="temp-animal-color" class="form-input" placeholder="เช่น สีดำ, หูตั้ง"></div>
+                    <div class="form-group" style="margin-bottom:5px;"><label>เพศ</label><select id="temp-animal-gender" class="form-input"><option value="ผู้">ผู้</option><option value="เมีย">เมีย</option><option value="ไม่ทราบ">ไม่ทราบ</option></select></div>
+                    <div class="form-group" style="margin-bottom:5px;"><label>พฤติกรรม</label><select id="temp-animal-behavior" class="form-input"><option value="1">1-ไม่เป็นมิตร</option><option value="2">2-เป็นมิตรเฉพาะผู้ดูแล</option><option value="3">3-เป็นมิตร</option></select></div>
+                 </div>
+                 <div class="form-grid-4col" style="margin-top:10px;">
+                    <div class="form-group" style="margin-bottom:5px;"><label>การทำหมัน</label><select id="temp-animal-neuter" class="form-input"><option value="ไม่ทราบ">ไม่ทราบ</option><option value="ยังไม่ทำ">ยังไม่ทำ</option><option value="ทำแล้ว">ทำแล้ว</option></select></div>
+                    <div class="form-group" style="margin-bottom:5px;"><label>วัคซีนพิษสุนัขบ้า</label><select id="temp-animal-vax" class="form-input" onchange="toggleVaxYear(this.value)"><option value="ยังไม่ฉีด/ไม่ทราบ">ยังไม่ฉีด/ไม่ทราบ</option><option value="ฉีดแล้ว">ฉีดแล้ว</option></select></div>
+                    <div class="form-group" id="div-vax-year" style="margin-bottom:5px; display:none;"><label>ปีที่ฉีด (พ.ศ.)</label><input type="number" id="temp-animal-vax-year" class="form-input" placeholder="เช่น 2567"></div>
+                 </div>
+                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
+                   <button type="button" id="btn-cancel-edit" class="form-button" onclick="cancelEditTempAnimal()" style="width:auto; padding: 8px 20px; background:#AAA; display:none;">ยกเลิกแก้ไข</button>
+                   <button type="button" id="btn-add-temp" class="form-button secondary" onclick="addTempAnimal()" style="width:auto; padding: 8px 25px;">+ เพิ่มลงรายการ</button>
+                 </div>
+              </div>
+              <div id="stray-list-container" style="margin-top:15px;"><p style="text-align:center; color:#ccc;">ยังไม่มีสัตว์ในรายการ</p></div>
+            </div>
+            <div style="margin-top:20px;"><button type="button" class="form-button" onclick="submitStrayReport()">ยืนยันการบันทึกข้อมูล ✅</button></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    pageDiv.innerHTML = html;
+    navigateTo(pageId);
+    tempAnimalsList = []; currentLocation = { lat: '', lng: '', mapLink: '' }; editingTempIndex = -1; 
+    loadPublicStrayFeed();
+  }
+
+  // ... (ส่วน Logic Map & Tabs คงเดิม) ...
+  function switchStrayTab(tabName) {
+    const viewTab = document.getElementById('tab-stray-view'); const addTab = document.getElementById('tab-stray-add');
+    const btns = document.querySelectorAll('.stray-tab-btn');
+    btns.forEach(btn => btn.classList.remove('active'));
+    if (tabName === 'view') {
+      viewTab.style.display = 'block'; addTab.style.display = 'none'; btns[0].classList.add('active');
+      loadPublicStrayFeed(); if (strayMap) { setTimeout(() => { strayMap.invalidateSize(); }, 300); }
+    } else {
+      viewTab.style.display = 'none'; addTab.style.display = 'block'; btns[1].classList.add('active');
+      setTimeout(() => { initSelectMap(); }, 300);
+    }
+  }
+
+  function initMap() {
+    if (!strayMap) {
+      strayMap = L.map('stray-map').setView([13.6433, 100.6650], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(strayMap);
+    }
+    updateMapMarkers();
+  }
+
+  function updateMapMarkers() {
+    strayMarkers.forEach(marker => marker.remove()); strayMarkers = [];
+    const mode = document.querySelector('input[name="map-mode"]:checked').value;
+    document.getElementById('legend-neuter').style.display = (mode === 'neuter' ? 'block' : 'none');
+    document.getElementById('legend-behavior').style.display = (mode === 'behavior' ? 'block' : 'none');
+    let locCounts = {}; 
+    allStrayData.forEach(item => {
+      const lat = parseFloat(item.lat); const lng = parseFloat(item.lng);
+      if (isNaN(lat) || isNaN(lng)) return; 
+      const locKey = lat.toFixed(5) + ',' + lng.toFixed(5);
+      if (!locCounts[locKey]) locCounts[locKey] = 0; locCounts[locKey]++;
+      const count = locCounts[locKey] - 1;
+      let finalLat = lat; let finalLng = lng;
+      if (count > 0) { const angle = count * 137.5 * (Math.PI / 180); const radius = 0.0003 * Math.sqrt(count); finalLat += radius * Math.cos(angle); finalLng += radius * Math.sin(angle); }
+      let colorClass = '';
+      if (mode === 'neuter') {
+        if (item.neuter === 'ทำแล้ว') colorClass = 'pin-neuter-done'; else if (item.neuter === 'ยังไม่ทำ') colorClass = 'pin-neuter-not'; else colorClass = 'pin-neuter-unknown';
+      } else {
+        if (item.behavior.includes('ไม่เป็นมิตร')) colorClass = 'pin-behav-danger'; else if (item.behavior.includes('เชื่อง')) colorClass = 'pin-behav-feeder'; else colorClass = 'pin-behav-friendly';
+      }
+      const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="pin-outer ${colorClass}"></div>`, iconSize: [20, 20], iconAnchor: [10, 10] });
+      const popupContent = `<strong>${item.type} ${item.color}</strong><br>พิกัด: ${item.location || '-'}<br>นิสัย: ${item.behavior}`;
+      const marker = L.marker([finalLat, finalLng], { icon: icon }).bindPopup(popupContent).addTo(strayMap);
+      strayMarkers.push(marker);
+    });
+  }
+
+  // --- Map Selection Logic ---
+  function initSelectMap() {
+    if (!selectMap) {
+      const startLat = 13.6433; const startLng = 100.6650;
+      selectMap = L.map('stray-select-map').setView([startLat, startLng], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(selectMap);
+      selectMarker = L.marker([startLat, startLng], {draggable: true}).addTo(selectMap);
+      selectMarker.on('dragend', function(event) { const marker = event.target; const position = marker.getLatLng(); updateSelectLocation(position.lat, position.lng); });
+      selectMap.on('click', function(e) { selectMarker.setLatLng(e.latlng); updateSelectLocation(e.latlng.lat, e.latlng.lng); });
+    }
+    document.getElementById('stray-select-map').style.display = 'block';
+    setTimeout(() => { selectMap.invalidateSize(); }, 200);
+  }
+  function toggleSelectMap() {
+    const mapDiv = document.getElementById('stray-select-map');
+    if (mapDiv.style.display === 'none') { initSelectMap(); } else { if (selectMap && selectMarker) { selectMap.setView(selectMarker.getLatLng(), 15); } }
+  }
+  function updateSelectLocation(lat, lng) {
+    currentLocation.lat = lat; currentLocation.lng = lng; currentLocation.mapLink = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+    document.getElementById('stray-lat-lng').value = lat.toFixed(5) + ', ' + lng.toFixed(5);
+    document.getElementById('stray-map-link').value = currentLocation.mapLink;
+  }
+  function getCurrentLocation() {
+    if (navigator.geolocation) {
+      showLoader(true);
+      navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+          showLoader(false); Swal.fire({ icon: 'success', title: 'ดึงพิกัดสำเร็จ', timer: 1000, showConfirmButton:false });
+          updateSelectLocation(lat, lng);
+          if (!selectMap) { initSelectMap(); } selectMarker.setLatLng([lat, lng]); selectMap.setView([lat, lng], 16);
+        }, err => { showLoader(false); Swal.fire('Error', 'ไม่สามารถดึงพิกัดได้', 'error'); });
+    } else { Swal.fire('Error', 'Browser ไม่รองรับ GPS', 'error'); }
+  }
+
+  // --- Load Feed & Rendering ---
+  function loadPublicStrayFeed() {
+    const container = document.getElementById('public-stray-feed');
+    google.script.run.withSuccessHandler(function(res) {
+         if(!res.success) { container.innerHTML = '<p>Error</p>'; return; }
+         allStrayData = res.data; renderGroupedStrayList(allStrayData); setTimeout(() => { initMap(); }, 300);
+      }).getPublicStrayData();
+  }
+
+  function renderGroupedStrayList(data) {
+    const container = document.getElementById('public-stray-feed');
+    if(data.length === 0) { container.innerHTML = '<p style="text-align:center; padding:30px;">❌ ไม่พบข้อมูล</p>'; return; }
+    let groups = {};
+    data.forEach(item => {
+      const lat = parseFloat(item.lat); const lng = parseFloat(item.lng);
+      const key = (isNaN(lat) ? 'unk' : lat.toFixed(4)) + ',' + (isNaN(lng) ? 'unk' : lng.toFixed(4));
+      if (!groups[key]) { groups[key] = { location: item.location || 'ไม่ระบุสถานที่', items: [], stats: { total: 0, neutered: 0, notNeutered: 0 } }; }
+      if (item.location && item.location.trim() !== '') groups[key].location = item.location;
+      groups[key].items.push(item);
+      groups[key].stats.total++;
+      if(item.neuter === 'ทำแล้ว') groups[key].stats.neutered++; else groups[key].stats.notNeutered++;
+    });
+
+    let html = ''; let groupIndex = 0; 
+    for (let key in groups) {
+      const g = groups[key]; const s = g.stats; const groupId = 'stray-group-' + groupIndex++; 
+      html += `<div class="stray-group-card"><div class="stray-group-header" onclick="toggleStrayGroup('${groupId}')"><div style="flex:1;"><div style="font-size:18px; font-weight:bold; color:#333;">📍 ${g.location}</div><div style="margin-top:5px; font-size:14px;"><span class="stat-badge bg-blue">รวม ${s.total}</span><span class="stat-badge bg-green">หมัน ${s.neutered}</span><span class="stat-badge bg-gray">ยัง ${s.notNeutered}</span></div></div><div style="font-size:20px; color:var(--col-royal);">▼</div></div><div id="${groupId}" class="stray-group-body">`;
+      const isAdmin = (currentUser && currentUser.role === 'Admin');
+      g.items.forEach(item => {
+        const icon = item.type === 'สุนัข' ? '🐕' : '🐈'; const vaxText = item.vaccine === 'ฉีดแล้ว' ? '💉 ฉีดแล้ว' : '⚠️ ยัง';
+        
+        // ✅ เพิ่มส่วนแสดงรูปภาพในรายการ Feed
+        let imgHtml = '';
+        if (item.image && item.image.startsWith('http')) {
+           imgHtml = `<img src="${item.image}" style="width:50px; height:50px; border-radius:8px; object-fit:cover; margin-right:10px; cursor:pointer; border:1px solid #ddd;" onclick="viewStrayImage('${item.image}')">`;
+        }
+
+        let adminHtml = isAdmin ? `<div style="margin-top:5px; padding-top:5px; border-top:1px dashed #EEE; font-size:14px; color:#555;">👤 ${item.feederName} (${item.feederPhone}) <button class="form-button secondary" style="padding:2px 10px; font-size:12px; width:auto; margin-left:10px;" onclick="openEditStrayModal('${item.dogId}', '${item.behavior}', '${item.vaccine}', '${item.vaccineYear}', '${item.neuter}')">✏️ แก้ไข</button></div>` : '';
+        html += `<div class="stray-item-row"><div style="display:flex; align-items:center;">${imgHtml}<div style="flex:1;"><strong style="color:var(--col-hawthorne); font-family:'Kanit',sans-serif;">${icon} ${item.color}</strong> (${item.gender}) <br><small>${item.behavior} | ${vaxText} | ✂️ ${item.neuter}</small>${adminHtml}</div></div></div>`;
+      });
+      html += `</div></div>`;
+    }
+    container.innerHTML = html;
+  }
+  
+  function toggleStrayGroup(id) { const el = document.getElementById(id); if (el) { if (el.classList.contains('expanded')) { el.classList.remove('expanded'); } else { el.classList.add('expanded'); } } }
+
+  // --- Add/Edit Item in List Logic ---
+  function toggleVaxYear(val) { document.getElementById('div-vax-year').style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+
+  function handleStrayImageSelect(input) {
+    if (input.files && input.files[0]) {
+       const file = input.files[0];
+       // ใช้ฟังก์ชัน resizeImage ตัวเดียวกับที่มีในระบบ (จาก JS_Member หรือประกาศใหม่ถ้าแยกไฟล์)
+       // เพื่อความชัวร์ ประกาศฟังก์ชัน resizeImage ไว้ล่างสุดของไฟล์นี้ด้วย
+       resizeStrayImage(file, 500, 0.7, (base64) => {
+          document.getElementById('stray-preview-image').src = base64;
+          document.getElementById('stray-image-base64').value = base64;
+       });
+    }
+  }
+
+  function addTempAnimal() {
+    const type = document.getElementById('temp-animal-type').value;
+    const color = document.getElementById('temp-animal-color').value;
+    const gender = document.getElementById('temp-animal-gender').value;
+    const behaviorVal = document.getElementById('temp-animal-behavior').value;
+    const neuter = document.getElementById('temp-animal-neuter').value;
+    const vax = document.getElementById('temp-animal-vax').value;
+    const vaxYear = document.getElementById('temp-animal-vax-year').value;
+    const imageBase64 = document.getElementById('stray-image-base64').value; // ✅ รับค่ารูป
+    
+    if (!color) { Swal.fire('ระบุสี/ตำหนิ'); return; }
+    if (vax === 'ฉีดแล้ว' && !vaxYear) { Swal.fire('ระบุปีที่ฉีดวัคซีน'); return; }
+
+    let behaviorText = behaviorVal == "1" ? "ไม่เป็นมิตร" : (behaviorVal == "2" ? "เชื่องกับผู้ดูแล" : "เป็นมิตรมาก");
+    
+    const animalObj = { type, color, gender, behavior: behaviorText, vaccine: vax, vaccineYear: (vax === 'ฉีดแล้ว') ? vaxYear : '-', neuter, image: imageBase64 };
+
+    if (editingTempIndex === -1) {
+       tempAnimalsList.push(animalObj);
+    } else {
+       tempAnimalsList[editingTempIndex] = animalObj;
+       cancelEditTempAnimal();
+    }
+    renderTempAnimals();
+    
+    // Clear
+    document.getElementById('temp-animal-color').value = '';
+    document.getElementById('temp-animal-vax').value = 'ยังไม่ฉีด/ไม่ทราบ';
+    document.getElementById('stray-image-base64').value = '';
+    document.getElementById('stray-preview-image').src = 'https://via.placeholder.com/150?text=No+Image';
+    toggleVaxYear('ยังไม่ฉีด/ไม่ทราบ');
+  }
+  
+  function editTempAnimal(index) {
+     const item = tempAnimalsList[index];
+     editingTempIndex = index;
+     document.getElementById('temp-animal-type').value = item.type;
+     document.getElementById('temp-animal-color').value = item.color;
+     document.getElementById('temp-animal-gender').value = item.gender;
+     document.getElementById('temp-animal-neuter').value = item.neuter;
+     document.getElementById('temp-animal-vax').value = item.vaccine;
+     toggleVaxYear(item.vaccine);
+     if(item.vaccine === 'ฉีดแล้ว') document.getElementById('temp-animal-vax-year').value = item.vaccineYear;
+     
+     let bVal = '3';
+     if(item.behavior.includes('ไม่เป็นมิตร')) bVal = '1'; else if(item.behavior.includes('เชื่อง')) bVal = '2';
+     document.getElementById('temp-animal-behavior').value = bVal;
+
+     // Load Image
+     if (item.image) {
+        document.getElementById('stray-preview-image').src = item.image;
+        document.getElementById('stray-image-base64').value = item.image;
+     } else {
+        document.getElementById('stray-preview-image').src = 'https://via.placeholder.com/150?text=No+Image';
+        document.getElementById('stray-image-base64').value = '';
+     }
+
+     const btnAdd = document.getElementById('btn-add-temp');
+     btnAdd.innerText = '💾 บันทึกการแก้ไข';
+     btnAdd.classList.remove('secondary');
+     btnAdd.classList.add('success');
+     document.getElementById('btn-cancel-edit').style.display = 'block';
+     document.getElementById('stray-animal-form-box').scrollIntoView({behavior: 'smooth'});
+  }
+
+  function cancelEditTempAnimal() {
+     editingTempIndex = -1;
+     const btnAdd = document.getElementById('btn-add-temp');
+     btnAdd.innerText = '+ เพิ่มลงรายการ';
+     btnAdd.classList.add('secondary');
+     btnAdd.classList.remove('success');
+     document.getElementById('btn-cancel-edit').style.display = 'none';
+     document.getElementById('temp-animal-color').value = '';
+     document.getElementById('stray-image-base64').value = '';
+     document.getElementById('stray-preview-image').src = 'https://via.placeholder.com/150?text=No+Image';
+  }
+
+  function renderTempAnimals() {
+    const container = document.getElementById('stray-list-container');
+    if (tempAnimalsList.length === 0) { container.innerHTML = '<p style="text-align:center; color:#ccc;">ยังไม่มีสัตว์ในรายการ</p>'; return; }
+    let html = '';
+    tempAnimalsList.forEach((a, i) => {
+      const icon = a.type === 'สุนัข' ? '🐕' : '🐈';
+      // ✅ แสดงรูปเล็กในรายการรอ
+      const imgTag = a.image ? `<img src="${a.image}" style="width:40px; height:40px; object-fit:cover; border-radius:4px; margin-right:10px;">` : '';
+      
+      html += `
+        <div class="stray-dog-item" style="display:flex; justify-content:space-between; align-items:center;">
+           <div style="flex:1; display:flex; align-items:center;">
+             ${imgTag}
+             <div>
+               <strong>${i+1}. ${icon} ${a.color}</strong> (${a.gender}) <br>
+               <small>💉 ${a.vaccine} | ✂️ ${a.neuter}</small>
+             </div>
+           </div>
+           <div>
+             <button class="icon-button edit-btn" onclick="editTempAnimal(${i})">✏️</button>
+             <button class="icon-button delete-btn" onclick="removeTempAnimal(${i})">✕</button>
+           </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  }
+
+  function removeTempAnimal(i) { 
+     tempAnimalsList.splice(i, 1); 
+     if (editingTempIndex === i) cancelEditTempAnimal(); 
+     else if (editingTempIndex > i) editingTempIndex--; 
+     renderTempAnimals(); 
+  }
+
+  function submitStrayReport() {
+    const name = document.getElementById('stray-feeder-name').value;
+    const phone = document.getElementById('stray-feeder-phone').value;
+    const locDesc = document.getElementById('stray-location-desc').value;
+    if (!name || !phone) { Swal.fire('ระบุชื่อ/เบอร์โทรผู้ดูแล'); return; }
+    if (!locDesc) { Swal.fire('กรุณาระบุจุดสังเกต/ชื่อสถานที่พบเจอ'); return; }
+    if (tempAnimalsList.length === 0) { Swal.fire('เพิ่มข้อมูลสัตว์อย่างน้อย 1 ตัว'); return; }
+
+    showLoader(true);
+    google.script.run.withSuccessHandler(res => {
+        showLoader(false);
+        if (res.success) {
+           Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', text: 'ขอบคุณที่แจ้งข้อมูล' });
+           tempAnimalsList = [];
+           document.getElementById('stray-location-desc').value = '';
+           document.getElementById('stray-feeder-name').value = '';
+           document.getElementById('stray-feeder-phone').value = '';
+           document.getElementById('stray-lat-lng').value = '';
+           renderTempAnimals();
+           currentLocation = { lat: '', lng: '', mapLink: '' };
+           editingTempIndex = -1;
+           switchStrayTab('view'); 
+           loadPublicStrayFeed(); 
+        } else { Swal.fire('Error', res.message, 'error'); }
+    }).saveStrayReport({name, phone}, {desc: locDesc, mapLink: currentLocation.mapLink, lat: currentLocation.lat, lng: currentLocation.lng}, tempAnimalsList);
+  }
+  
+  // Admin Edit ... (Keep existing code)
+  function openEditStrayModal(dogId, behav, vax, vaxYear, neuter) {
+    let behavVal = '3'; if(behav.includes('ไม่เป็นมิตร')) behavVal = '1'; else if(behav.includes('เชื่อง')) behavVal = '2';
+    let html = `<div class="modal-overlay-close"></div><div class="modal-content" style="max-width: 400px;"><h3 class="form-title">แก้ไขข้อมูลสัตว์</h3><form id="edit-stray-form"><input type="hidden" id="edit-dog-id" value="${dogId}"><div class="form-group"><label>พฤติกรรม</label><select id="edit-behav" class="form-input"><option value="1-ไม่เป็นมิตร (จับไม่ได้)" ${behavVal=='1'?'selected':''}>ไม่เป็นมิตร (จับไม่ได้)</option><option value="2-เป็นมิตรเฉพาะผู้ดูแล" ${behavVal=='2'?'selected':''}>เป็นมิตรเฉพาะผู้ดูแล</option><option value="3-เป็นมิตร (ใครก็จับได้)" ${behavVal=='3'?'selected':''}>เป็นมิตร (ใครก็จับได้)</option></select></div><div class="form-group"><label>การทำหมัน</label><select id="edit-neuter" class="form-input"><option value="ไม่ทราบ" ${neuter=='ไม่ทราบ'?'selected':''}>ไม่ทราบ</option><option value="ยังไม่ทำ" ${neuter=='ยังไม่ทำ'?'selected':''}>ยังไม่ทำ</option><option value="ทำแล้ว" ${neuter=='ทำแล้ว'?'selected':''}>ทำแล้ว</option></select></div><div class="form-group"><label>วัคซีน</label><select id="edit-vax" class="form-input" onchange="toggleEditVaxYear(this.value)"><option value="ยังไม่ฉีด/ไม่ทราบ" ${vax.includes('ยัง')?'selected':''}>ยังไม่ฉีด/ไม่ทราบ</option><option value="ฉีดแล้ว" ${vax=='ฉีดแล้ว'?'selected':''}>ฉีดแล้ว</option></select></div><div class="form-group" id="edit-div-vax-year" style="display:${vax=='ฉีดแล้ว'?'block':'none'}"><label>ปีที่ฉีด</label><input type="number" id="edit-vax-year" class="form-input" value="${vaxYear}"></div><button type="submit" class="form-button">บันทึกการแก้ไข</button></form></div>`;
+    modalContainer.innerHTML = html; modalContainer.style.display = 'flex'; modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal); document.getElementById('edit-stray-form').addEventListener('submit', handleEditStraySubmit);
+  }
+  function toggleEditVaxYear(val) { document.getElementById('edit-div-vax-year').style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+  function handleEditStraySubmit(e) { e.preventDefault(); showLoader(true); const dogId = document.getElementById('edit-dog-id').value; const updateData = { behavior: document.getElementById('edit-behav').options[document.getElementById('edit-behav').selectedIndex].text, neuter: document.getElementById('edit-neuter').value, vaccine: document.getElementById('edit-vax').value, vaccineYear: document.getElementById('edit-vax-year').value }; if(updateData.behavior.includes('-')) updateData.behavior = updateData.behavior.split('-')[1]; google.script.run.withSuccessHandler(res => { showLoader(false); if(res.success) { closePetModal(); Swal.fire({icon:'success', title:'แก้ไขสำเร็จ', timer:1500, showConfirmButton:false}); loadPublicStrayFeed(); } else { Swal.fire('Error', res.message, 'error'); } }).adminUpdateStrayDog(dogId, updateData); }
+  function closePetModal() { modalContainer.style.display = 'none'; modalContainer.innerHTML = ''; }
+  function filterStrayList() { const query = document.getElementById('stray-search-input').value.toLowerCase(); const filtered = allStrayData.filter(item => { const text = (item.location + item.color + item.breed + item.type).toLowerCase(); return text.includes(query); }); renderGroupedStrayList(filtered); }
+  function viewStrayImage(url) { Swal.fire({ imageUrl: url, showConfirmButton: false, showCloseButton: true, background: 'rgba(255, 255, 255, 0.9)' }); }
+
+  // ✅ Image Compression Helper (สำหรับหน้า Stray)
+  function resizeStrayImage(file, maxWidth, quality, callback) {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = function(event) {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = function() {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round(height * (maxWidth / width));
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        callback(dataUrl);
+      };
+    };
+  }
+</script>

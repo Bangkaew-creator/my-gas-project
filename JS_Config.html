@@ -1,0 +1,203 @@
+<script>
+  function loadConfigPage() {
+    toggleSidebar(false);
+    const pageId = 'config-page';
+    let pageDiv = document.getElementById(pageId);
+    
+    if (!pageDiv) {
+      pageDiv = document.createElement('div');
+      pageDiv.id = pageId;
+      pageDiv.className = 'page';
+      document.getElementById('app-content').appendChild(pageDiv);
+    }
+
+    let html = `
+      <style>
+        .cfg-switch { position: relative; display: inline-block; width: 50px; height: 26px; margin-right:10px; }
+        .cfg-switch input { opacity: 0; width: 0; height: 0; }
+        .cfg-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .cfg-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .cfg-slider { background-color: var(--col-hawthorne); }
+        input:checked + .cfg-slider:before { transform: translateX(24px); }
+        .color-preview-box { width: 100%; height: 80px; border-radius: 8px; margin-top: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: background 0.3s; }
+      </style>
+
+      <div class="form-container" style="max-width: 600px;">
+        <h2 class="form-title">🎨 ปรับแต่งหน้าตาเว็บ (UI Config)</h2>
+        <p style="text-align:center; color:#666; margin-bottom:20px;">เฉพาะผู้ดูแลระบบเท่านั้น</p>
+
+        <div class="management-section" style="margin-top:0;">
+          <div class="section-header"><h3 class="section-title">1. ชุดสีและสไตล์ (Theme)</h3></div>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label>สีหลัก (Header, ปุ่มหลัก)</label>
+              <input type="color" id="cfg-col-main" class="form-input" style="height:50px; padding:2px;" onchange="previewConfig()">
+            </div>
+            <div class="form-group">
+              <label>สีรอง (Highlight)</label>
+              <input type="color" id="cfg-col-sec" class="form-input" style="height:50px; padding:2px;" onchange="previewConfig()">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>สีพื้นหลัง Accent</label>
+              <input type="color" id="cfg-col-accent" class="form-input" style="height:50px; padding:2px;" onchange="previewConfig()">
+            </div>
+            <div class="form-group">
+              <label>สีพื้นหลังเว็บไซต์</label>
+              <input type="color" id="cfg-col-bg" class="form-input" style="height:50px; padding:2px;" onchange="previewConfig()">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:10px; display:flex; align-items:center; background:#f5f5f5; padding:15px; border-radius:8px;">
+             <label class="cfg-switch">
+               <input type="checkbox" id="cfg-gradient" onchange="previewConfig()">
+               <span class="cfg-slider"></span>
+             </label>
+             <span style="font-size:16px;">ใช้การไล่เฉดสี (Gradient Effect) 🌈</span>
+          </div>
+        </div>
+
+        <div class="management-section">
+          <div class="section-header"><h3 class="section-title">2. รูปแบบตัวอักษรและปุ่ม</h3></div>
+          
+          <div class="form-group">
+            <label>ฟอนต์หลัก (Font Family)</label>
+            <select id="cfg-font" class="form-input" onchange="previewConfig()">
+              <optgroup label="ทางการ / อ่านง่าย">
+                <option value="Sarabun">Sarabun (สารบรรณ - มาตรฐาน)</option>
+                <option value="Krub">Krub (ครับ - ทางการสมัยใหม่)</option>
+                <option value="Niramit">Niramit (นิรมิต - อ่านง่าย)</option>
+              </optgroup>
+              <optgroup label="ทันสมัย / โมเดิร์น">
+                <option value="Kanit">Kanit (คณิต - ยอดนิยม)</option>
+                <option value="Prompt">Prompt (พร้อม - กว้างสบายตา)</option>
+                <option value="Bai Jamjuree">Bai Jamjuree (ใบจามจุรี - เหลี่ยมล้ำๆ)</option>
+                <option value="Chakra Petch">Chakra Petch (จักรเพชร - สปอร์ต)</option>
+              </optgroup>
+              <optgroup label="ลายมือ / เป็นกันเอง">
+                <option value="Mali">Mali (มะลิ - น่ารัก)</option>
+                <option value="Itim">Itim (ไอติม - ลายมือมนๆ)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>ความโค้งมน (Border Radius): <span id="cfg-radius-text">8px</span></label>
+            <input type="range" id="cfg-radius-range" min="0" max="30" step="2" style="width:100%;" oninput="updateRadiusVal(this.value)">
+            <input type="hidden" id="cfg-radius">
+          </div>
+        </div>
+
+        <!-- Live Preview -->
+        <div class="management-section" style="border: 2px dashed #ccc; background: var(--bg-color);">
+          <h4 style="text-align:center; margin-bottom:15px;">ตัวอย่างการแสดงผล (Preview)</h4>
+          <div style="text-align:center; padding:10px;">
+             <button class="form-button" id="preview-btn-main" style="width:auto; margin-bottom:10px;">ปุ่มหลัก</button>
+             <button class="form-button secondary" id="preview-btn-sec" style="width:auto; background-color:var(--col-thistle);">ปุ่มรอง</button>
+             
+             <!-- Preview Card -->
+             <div id="preview-card" class="color-preview-box">
+                การ์ดข้อมูล (สุนัข/แมว)
+             </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px; display:flex; gap:10px;">
+          <button type="button" class="form-button success" onclick="saveConfig()">💾 บันทึกและใช้งานจริง</button>
+          <button type="button" class="form-button secondary" onclick="resetConfig()">↺ คืนค่าเดิม</button>
+        </div>
+      </div>
+    `;
+
+    pageDiv.innerHTML = html;
+    navigateTo(pageId);
+    loadCurrentConfig();
+  }
+
+  function loadCurrentConfig() {
+    showLoader(true);
+    google.script.run.withSuccessHandler(config => {
+      document.getElementById('cfg-col-main').value = config.colHawthorne || '#283D3B';
+      document.getElementById('cfg-col-sec').value = config.colRoyal || '#795663';
+      document.getElementById('cfg-col-accent').value = config.colDusky || '#D9BCAF';
+      document.getElementById('cfg-col-bg').value = config.colBg || '#F9F7F5';
+      document.getElementById('cfg-font').value = config.fontFamily || 'Sarabun';
+      document.getElementById('cfg-gradient').checked = (config.useGradient === 'true'); 
+      
+      let radius = parseInt(config.borderRadius) || 8;
+      document.getElementById('cfg-radius-range').value = radius;
+      updateRadiusVal(radius);
+      
+      showLoader(false);
+      previewConfig(); 
+    }).getUiConfig();
+  }
+
+  function updateRadiusVal(val) {
+    document.getElementById('cfg-radius-text').innerText = val + 'px';
+    document.getElementById('cfg-radius').value = val + 'px';
+    previewConfig();
+  }
+
+  function previewConfig() {
+    const root = document.documentElement;
+    const mainColor = document.getElementById('cfg-col-main').value;
+    const secColor = document.getElementById('cfg-col-sec').value;
+    const accentColor = document.getElementById('cfg-col-accent').value;
+    const bgColor = document.getElementById('cfg-col-bg').value;
+    const font = document.getElementById('cfg-font').value;
+    const radius = document.getElementById('cfg-radius').value;
+    const useGradient = document.getElementById('cfg-gradient').checked;
+
+    // Apply Basic Vars
+    root.style.setProperty('--col-hawthorne', mainColor);
+    root.style.setProperty('--col-royal', secColor);
+    root.style.setProperty('--col-dusky-rose', accentColor);
+    root.style.setProperty('--bg-color', bgColor);
+    root.style.setProperty('--radius-soft', radius);
+    root.style.setProperty('--font-main', `'${font}', sans-serif`);
+    
+    // Apply Preview Specifics
+    const previewCard = document.getElementById('preview-card');
+    if (useGradient) {
+       previewCard.style.background = `linear-gradient(135deg, ${mainColor}, #011627)`;
+    } else {
+       previewCard.style.background = mainColor;
+    }
+  }
+
+  function saveConfig() {
+    const config = {
+      colHawthorne: document.getElementById('cfg-col-main').value,
+      colRoyal: document.getElementById('cfg-col-sec').value,
+      colDusky: document.getElementById('cfg-col-accent').value,
+      colBg: document.getElementById('cfg-col-bg').value,
+      fontFamily: document.getElementById('cfg-font').value,
+      borderRadius: document.getElementById('cfg-radius').value,
+      useGradient: document.getElementById('cfg-gradient').checked ? 'true' : 'false'
+    };
+
+    showLoader(true);
+    google.script.run.withSuccessHandler(res => {
+      showLoader(false);
+      if(res.success) {
+        Swal.fire({icon:'success', title:'บันทึกเรียบร้อย', text:'รีเฟรชหน้าเว็บเพื่อดูผลลัพธ์', confirmButtonText: 'รีเฟรช'}).then((r) => {
+          if (r.isConfirmed) location.reload();
+        });
+      } else {
+        Swal.fire('Error', res.message, 'error');
+      }
+    }).saveUiConfig(config);
+  }
+
+  function resetConfig() {
+    Swal.fire({ title: 'คืนค่าเดิม?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ยืนยัน' }).then((r) => {
+      if (r.isConfirmed) {
+        showLoader(true);
+        google.script.run.withSuccessHandler(() => location.reload()).resetUiConfig();
+      }
+    });
+  }
+</script>

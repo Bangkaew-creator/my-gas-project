@@ -1,0 +1,239 @@
+<style>
+  /* --- 0. Import Fonts & Basic Setup --- */
+  @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600&display=swap');
+
+  :root {
+    /* Vintage Botanical Palette */
+    --col-dusky-rose: #D9BCAF;
+    --col-thistle: #8A9688;
+    --col-hawthorne: #283D3B;
+    --col-royal: #795663;
+    --col-blue-noir: #011627;
+
+    /* Map to System Variables */
+    --color-purple: var(--col-hawthorne); 
+    --color-pink: var(--col-royal);
+    --color-magenta: var(--col-royal);
+    --color-orange: var(--col-dusky-rose);
+    --color-yellow: var(--col-thistle);
+    --color-light-yellow: #F9F871;
+    --color-green: #5c7c5a;
+
+    --text-color: var(--col-blue-noir);
+    --bg-color: #F9F7F5; 
+    --nav-bg: #FFFFFF; 
+    --nav-border: var(--col-dusky-rose);
+    --shadow-light: 0 2px 4px rgba(40, 61, 59, 0.05);
+    --shadow-medium: 0 4px 8px rgba(40, 61, 59, 0.1);
+  }
+
+  /* --- ⚠️ ส่วนสำคัญ: CSS สำหรับหมุดแผนที่ (Pin Styles) --- */
+  /* ต้องมีส่วนนี้ หมุดถึงจะแสดง */
+  .leaflet-container {
+    font-family: 'Sarabun', sans-serif !important;
+    font-size: 14px;
+  }
+  
+  /* ตัวกล่องครอบไอคอน (ต้องไม่มีขอบ ไม่มีพื้นหลัง) */
+  .custom-div-icon {
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  /* ตัวหมุดวงกลม */
+  .pin-outer {
+    width: 18px; 
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5); /* เพิ่มเงาให้ชัดขึ้น */
+    display: block;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* สีหมุด (ตามสถานะ) */
+  .pin-neuter-done { background-color: #28a745 !important; } /* เขียว */
+  .pin-neuter-not { background-color: #dc3545 !important; }  /* แดง */
+  .pin-neuter-unknown { background-color: #6c757d !important; } /* เทา */
+  
+  .pin-behav-friendly { background-color: #28a745 !important; } /* เขียว */
+  .pin-behav-feeder { background-color: #ffc107 !important; }   /* เหลือง */
+  .pin-behav-danger { background-color: #dc3545 !important; }   /* แดง */
+
+  /* --- จบส่วนหมุด --- */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Sarabun', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+  }
+
+  /* --- 1. Loader --- */
+  #loader-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(255, 255, 255, 0.95);
+    display: flex; justify-content: center; align-items: center;
+    flex-direction: column; z-index: 9999; transition: opacity 0.3s ease;
+  }
+  .loader-spinner {
+    border: 6px solid #eee; border-top: 6px solid var(--col-hawthorne);
+    border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;
+  }
+  #loader-overlay p { margin-top: 20px; font-family: 'Kanit', sans-serif; font-size: 18px; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  /* --- 2. Nav Bar --- */
+  #app-navbar {
+    background-color: var(--nav-bg); height: 70px; border-bottom: 1px solid var(--nav-border);
+    display: flex; justify-content: center; align-items: center; padding: 0 15px;
+    position: sticky; top: 0; z-index: 1000; box-shadow: var(--shadow-light);
+  }
+  .navbar-brand { display: flex; align-items: center; justify-content: center; width: 100%; overflow: hidden; }
+  .navbar-logo { height: 45px; width: 45px; margin-right: 10px; border-radius: 5px; flex-shrink: 0; }
+  .navbar-title {
+    font-family: 'Kanit', sans-serif; font-size: 20px; font-weight: 500; color: var(--col-hawthorne);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* --- 2.1 Menu Bar --- */
+  #main-menu-bar {
+    background-color: #ffffff; border-bottom: 1px solid var(--nav-border); padding: 10px 15px;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; align-items: center; box-shadow: var(--shadow-light);
+  }
+  .menu-welcome { font-family: 'Kanit', sans-serif; font-size: 16px; color: var(--text-color); margin-right: 10px; padding: 5px 0; }
+  
+  .nav-button {
+    font-family: 'Kanit', sans-serif; font-size: 15px;
+    background-color: #f0f2f1; border: 1px solid transparent; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px;
+    transition: all 0.2s ease; color: var(--col-hawthorne);
+  }
+  #nav-login-btn { background-color: var(--col-hawthorne); color: white; }
+  #nav-login-btn:hover { background-color: #1e2e2c; transform: translateY(-1px); }
+  #nav-logout-btn { background-color: var(--col-royal); color: white; }
+  #nav-logout-btn:hover { background-color: #5e434d; transform: translateY(-1px); }
+  #nav-stray-btn { background-color: var(--col-thistle); color: white; }
+  #nav-stray-btn:hover { background-color: #768274; transform: translateY(-1px); }
+  .nav-button:hover {
+    background-color: var(--col-dusky-rose); color: var(--col-blue-noir); transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+
+  /* --- 3. Main Content --- */
+  #app-content { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .page { display: none; }
+  .page-active { display: block; }
+
+  /* --- 4. Dashboard & Cards --- */
+  h2.dashboard-title { font-family: 'Kanit', sans-serif; font-size: 26px; font-weight: 600; margin-bottom: 20px; color: var(--col-hawthorne); }
+  .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .dashboard-grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  
+  .summary-card {
+    background-color: #ffffff; border-radius: 12px; padding: 25px;
+    box-shadow: var(--shadow-medium); color: white; position: relative; overflow: hidden;
+  }
+  /* Gradient Backgrounds */
+  .card-color-1 { background: linear-gradient(135deg, var(--col-hawthorne), var(--col-blue-noir)); }
+  .card-color-2 { background: linear-gradient(135deg, var(--col-royal), var(--col-hawthorne)); }
+  .card-color-3 { background: linear-gradient(135deg, var(--col-thistle), var(--col-hawthorne)); }
+  .card-color-4 { background: linear-gradient(135deg, var(--col-dusky-rose), var(--col-royal)); }
+  .card-color-5 { background: linear-gradient(135deg, var(--col-thistle), var(--col-blue-noir)); }
+  .card-color-6 { background: linear-gradient(135deg, var(--col-blue-noir), var(--col-royal)); }
+
+  .card-title { font-family: 'Kanit', sans-serif; font-size: 18px; font-weight: 400; opacity: 0.9; color: inherit; margin-bottom: 5px; }
+  .card-value-main { font-family: 'Kanit', sans-serif; font-size: 42px; font-weight: 700; color: inherit; margin-top: 10px; }
+  .card-value-main .unit { font-size: 18px; font-weight: 400; opacity: 0.8; color: inherit; margin-left: 5px; }
+  .card-bg-icon { position: absolute; right: 15px; bottom: 5px; font-size: 80px; line-height: 1; opacity: 0.15; color: white; user-select: none; z-index: 0; pointer-events: none; }
+  .summary-card > * { position: relative; z-index: 1; }
+
+  /* --- 5. Form Styles --- */
+  .form-container { max-width: 500px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: var(--shadow-medium); padding: 30px 40px; }
+  .form-title { font-family: 'Kanit', sans-serif; font-size: 24px; font-weight: 500; text-align: center; margin-bottom: 25px; color: var(--col-hawthorne); }
+  .form-group { margin-bottom: 20px; }
+  .form-group label { font-family: 'Kanit', sans-serif; display: block; margin-bottom: 8px; font-size: 16px; color: #555; }
+  .form-input {
+    width: 100%; padding: 12px 15px; font-family: 'Sarabun', sans-serif; font-size: 16px;
+    border: 1px solid #ccc; border-radius: 8px; transition: border-color 0.2s ease;
+  }
+  input[type="number"].form-input { font-family: 'Kanit', sans-serif; text-align: center; }
+  select.form-input { font-family: 'Kanit', sans-serif; }
+  textarea.form-input { min-height: 80px; }
+  .form-input:focus { border-color: var(--col-hawthorne); outline: none; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+  .form-grid-4col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+
+  .form-button {
+    width: 100%; padding: 12px; font-family: 'Kanit', sans-serif; font-size: 18px; font-weight: 500;
+    color: white; background-color: var(--col-hawthorne); border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s ease;
+  }
+  .form-button.secondary { background-color: #aaa; } .form-button.secondary:hover { background-color: #888; }
+  .form-button.success { background-color: var(--color-green); } .form-button.success:hover { background-color: #4a6649; }
+  .form-button:hover { background-color: #1e2e2c; }
+  
+  .form-link { display: block; width: 100%; text-align: center; margin-top: 25px; font-family: 'Kanit', sans-serif; font-size: 16px; color: var(--col-royal); cursor: pointer; }
+  .form-link.small { margin-top: 15px; font-size: 15px; color: var(--col-thistle); }
+  .form-link:hover { text-decoration: underline; }
+  .error-message { background-color: #ffebee; color: #c62828; border: 1px solid #c62828; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; display: none; font-family: 'Kanit', sans-serif; font-size: 16px; }
+  
+  .swal2-popup { font-family: 'Kanit', sans-serif !important; border-radius: 12px !important; }
+  .swal2-html-container { font-family: 'Sarabun', sans-serif !important; font-size: 18px !important; }
+  .swal2-confirm { background-color: var(--col-hawthorne) !important; }
+
+  /* --- 6. Management & Tables --- */
+  .management-section { background-color: #ffffff; border-radius: 12px; padding: 25px; box-shadow: var(--shadow-light); margin-top: 30px; }
+  .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--bg-color); margin-bottom: 20px; padding-bottom: 10px; }
+  .section-title { font-family: 'Kanit', sans-serif; font-size: 22px; font-weight: 500; margin: 0; padding: 0; border: none; color: var(--col-hawthorne); }
+  .data-table-wrapper { overflow-x: auto; }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th, .data-table td { padding: 12px 15px; border-bottom: 1px solid var(--nav-border); text-align: left; font-size: 16px; }
+  .data-table th { font-family: 'Kanit', sans-serif; font-size: 16px; background-color: var(--bg-color); color: var(--col-hawthorne); }
+  .icon-button { background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px; margin-right: 8px; }
+  .edit-btn { color: var(--col-thistle); } .delete-btn { color: var(--col-royal); }
+  .view-pets-btn { color: var(--col-hawthorne); } .reset-pass-btn { color: var(--color-orange); }
+
+  /* --- 7. Modals --- */
+  #modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; background-color: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; }
+  .modal-overlay-close { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  .modal-content { background: white; border-radius: 12px; padding: 30px 40px; width: 90%; max-width: 700px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+  .admin-filter-bar { background-color: #ffffff; border-radius: 12px; padding: 20px 25px; box-shadow: var(--shadow-light); margin-top: -10px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr 100px; gap: 15px; align-items: flex-end; }
+  .admin-filter-bar .form-group { margin-bottom: 0; }
+  
+  .profile-details { font-size: 18px; line-height: 2; }
+  .profile-details strong { font-family: 'Kanit', sans-serif; color: #555; min-width: 120px; display: inline-block; }
+  .profile-actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 15px; }
+  .profile-actions .form-button { width: auto; }
+  .radio-button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .radio-button-group input[type="radio"] { display: none; }
+  .radio-button-group .radio-btn { font-family: 'Kanit', sans-serif; font-size: 16px; background-color: var(--bg-color); border: 1px solid var(--nav-border); padding: 12px; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s ease; }
+  .radio-button-group .radio-btn:hover { background-color: #e9e9e9; }
+  .radio-button-group input[type="radio"]:checked + .radio-btn { background-color: var(--col-hawthorne); color: white; border-color: var(--col-hawthorne); }
+  
+  .stray-group-card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; overflow: hidden; border: 1px solid #EEE; }
+  .stray-group-header { padding: 15px; background: #FAFAFA; border-bottom: 1px solid #EEE; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .stray-group-header:hover { background: #F0F0F0; }
+  .stray-item-row { padding: 12px 15px; border-bottom: 1px solid #EEE; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-family: 'Sarabun', sans-serif; font-size: 16px; }
+  
+  .map-controls { background: white; padding: 10px 15px; border-radius: 8px; box-shadow: var(--shadow-light); margin-bottom: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; font-family: 'Kanit', sans-serif; font-size: 15px; }
+  
+  .location-btn { background-color: var(--col-dusky-rose); color: #333; display: flex; align-items: center; justify-content: center; gap: 5px; font-family: 'Kanit', sans-serif; }
+  .location-btn:hover { background-color: #cbb0a5; }
+
+  /* --- Media Queries (Mobile) --- */
+  @media (max-width: 768px) {
+    .navbar-title { font-size: 16px; white-space: normal; text-align: center; line-height: 1.2; }
+    #app-navbar { height: auto; padding: 10px 15px; }
+    #main-menu-bar { padding: 10px; gap: 10px; }
+    .menu-welcome { width: 100%; text-align: center; margin-right: 0; margin-bottom: 5px; border-bottom: 1px solid #eee; }
+    .nav-button { flex: 1; justify-content: center; font-size: 14px; padding: 8px 10px; }
+    .dashboard-grid, .form-grid-4col, .dashboard-grid-2col, .form-grid, .admin-filter-bar { grid-template-columns: 1fr; }
+    .admin-filter-bar .form-button { width: 100%; }
+    .form-input { font-size: 16px; }
+    .form-group { margin-bottom: 10px; }
+    .form-container { padding: 20px; }
+  }
+</style>

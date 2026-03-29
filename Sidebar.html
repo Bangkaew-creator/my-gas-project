@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+      :root {
+        --primary-color: #FF9800; --primary-light: #FFE0B2; --primary-dark: #F57C00;
+        --text-color: #37474F; --bg-color: #FFF3E0; --card-bg: #FFFFFF;
+        --success: #4CAF50; --danger: #D32F2F; --toast-bg: #323232; --border-color: #E0E0E0;
+      }
+      body { font-family: 'Prompt', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; overflow-x: hidden; }
+      
+      .tabs { display: flex; background: var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 20; }
+      .tab-btn { flex: 1; padding: 12px 0; text-align: center; background: none; border: none; border-bottom: 3px solid transparent; font-family: 'Prompt', sans-serif; font-weight: 500; color: #78909C; cursor: pointer; transition: 0.3s; }
+      .tab-btn.active { color: var(--primary-dark); border-bottom: 3px solid var(--primary-dark); background-color: rgba(255, 152, 0, 0.05); }
+      .tab-content { display: none; padding: 16px; padding-bottom: 90px; }
+      .tab-content.active { display: block; animation: fadeIn 0.3s; }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      
+      .section-title { font-size: 14px; font-weight: 600; color: var(--primary-dark); margin: 15px 0 10px 0; display: flex; align-items: center; gap: 5px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+      .form-group { margin-bottom: 12px; }
+      .form-group label { display: block; font-size: 12px; margin-bottom: 4px; color: #546E7A; }
+      .form-control { width: 100%; padding: 8px 10px; border: 1px solid #CFD8DC; border-radius: 6px; font-family: 'Prompt', sans-serif; font-size: 13px; box-sizing: border-box; transition: 0.2s; }
+      .form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-light); }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      
+      .card-box { background: var(--card-bg); padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 15px; }
+      .btn-outline { border: 1px dashed var(--primary-color); background: transparent; color: var(--primary-dark); width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-family: 'Prompt'; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px; transition: 0.2s; margin-top: 5px; }
+      .btn-outline:hover { background: var(--primary-light); }
+      
+      .input-group { display: flex; gap: 8px; }
+      .search-btn { background-color: var(--primary-color); border: none; border-radius: 6px; color: white; padding: 0 12px; cursor: pointer; width: 45px; display: flex; align-items: center; justify-content: center; }
+      
+      .fab-container { position: fixed; bottom: 0; left: 0; width: 100%; padding: 12px 16px; box-sizing: border-box; background: var(--card-bg); box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 10; display: none; }
+      .save-btn { background: var(--primary-dark); color: white; border: none; padding: 10px; border-radius: 20px; font-family: 'Prompt'; font-weight: 600; width: 100%; cursor: pointer; display: flex; justify-content: center; gap: 8px; box-shadow: 0 2px 5px rgba(245, 124, 0, 0.4); }
+      
+      .empty-state { text-align: center; color: #999; margin-top: 20px; font-size: 13px; }
+      .pet-item { background: #F8FDFF; border: 1px solid #E1F5FE; border-radius: 6px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+      .btn-delete { background: #FFEBEE; color: var(--danger); border: none; border-radius: 4px; padding: 5px; cursor: pointer; }
+      
+      /* Pet Cards Styling */
+      .pet-card { background: var(--card-bg); border-radius: 8px; padding: 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-left: 4px solid transparent; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; transition: 0.3s; }
+      .pet-card.selected { border-left-color: var(--success); background-color: #F1F8E9; }
+      
+      /* คลาสสำหรับบอกสถานะ "กำลังจะถูกลบ" */
+      .pet-card.marked-delete { 
+        background-color: #FAFAFA; 
+        opacity: 0.6; 
+        border-left-color: var(--danger);
+      }
+      .pet-card.marked-delete .pet-name { text-decoration: line-through; color: var(--danger); }
+      .pet-card.marked-delete .pet-status { text-decoration: line-through; }
+      
+      .pet-icon { background: var(--primary-light); color: var(--primary-dark); width: 36px; min-width: 36px; max-width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+      .pet-icon span { font-size: 20px; }
+      .pet-info { flex-grow: 1; min-width: 0; transition: 0.3s; } 
+      .pet-name { font-weight: 600; font-size: 14px; margin: 0; color: #333; transition: 0.3s; }
+      .pet-status { font-size: 11px; color: #777; word-break: break-all; margin-top: 2px; transition: 0.3s; }
+      
+      .pet-card-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+      .btn-trash { background: none; border: none; color: #B0BEC5; cursor: pointer; padding: 0; transition: color 0.2s; }
+      .btn-trash:hover { color: var(--danger); }
+      
+      .checkbox-wrapper { position: relative; }
+      .toggle { cursor: pointer; display: inline-block; }
+      .toggle-switch { display: inline-block; background: #ccc; border-radius: 16px; width: 36px; height: 20px; position: relative; vertical-align: middle; transition: 0.25s; }
+      .toggle-switch:before { content: ""; display: block; background: white; border-radius: 50%; width: 14px; height: 14px; position: absolute; top: 3px; left: 3px; transition: 0.25s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+      .toggle-checkbox:checked + .toggle-switch { background: var(--success); }
+      .toggle-checkbox:checked + .toggle-switch:before { left: 19px; }
+      .toggle-checkbox { position: absolute; visibility: hidden; }
+
+      .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.9); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+      .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+      .loading-text { font-size: 15px; font-weight: 600; color: var(--primary-dark); text-align: center; }
+      .loading-subtext { font-size: 12px; color: #757575; margin-top: 5px; font-weight: 400; text-align: center; padding: 0 20px;}
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+      #toast { visibility: hidden; min-width: 200px; background-color: var(--toast-bg); color: #fff; text-align: center; border-radius: 20px; padding: 10px 20px; position: fixed; z-index: 10000; left: 50%; bottom: 80px; transform: translateX(-50%); font-size: 13px; opacity: 0; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+      #toast.show { visibility: visible; opacity: 1; }
+      #toast.success { background-color: var(--success); }
+      #toast.error { background-color: var(--danger); }
+    </style>
+  </head>
+  <body>
+
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <div class="loading-text" id="loadingTitle">กำลังประมวลผล...</div>
+      <div class="loading-subtext" id="loadingDesc">กรุณารอสักครู่ ห้ามปิดหรือรีเฟรชหน้าต่างนี้</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="openTab('mainTab')">จัดการข้อมูล</button>
+      <button class="tab-btn" onclick="openTab('certTab')">ใบรับรอง</button>
+    </div>
+
+    <div id="mainTab" class="tab-content active">
+      <div class="card-box" style="padding:10px;">
+        <label style="font-size:12px; color:#666;">ค้นหา HouseholdKey (เลขที่บ้าน-หมู่)</label>
+        <div class="input-group" style="margin-top:5px;">
+          <input type="text" id="searchInput" class="form-control" placeholder="เช่น 45/31-9" onkeyup="if(event.keyCode===13) searchData()">
+          <button class="search-btn" onclick="searchData()"><span class="material-icons">search</span></button>
+        </div>
+      </div>
+      
+      <div id="workspace-area">
+        <div class="empty-state">
+          <span class="material-icons" style="font-size:40px; color:#CFD8DC;">search</span>
+          <p>กรุณาค้นหาบ้านเลขที่ เพื่อเริ่มทำงาน</p>
+        </div>
+      </div>
+
+      <div class="card-box" id="addPetSection" style="display:none; border: 1px solid #FFE0B2;">
+        <div class="section-title"><span class="material-icons" style="font-size:16px;">add_circle</span> เพิ่มสัตว์ตัวใหม่ (หน้างาน)</div>
+        <div class="grid-2">
+          <div class="form-group"><label>ชื่อสัตว์ *</label><input type="text" id="petName" class="form-control"></div>
+          <div class="form-group"><label>ประเภท *</label>
+            <select id="petType" class="form-control"><option value="สุนัข">สุนัข</option><option value="แมว">แมว</option></select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>เพศ</label>
+            <select id="petSex" class="form-control"><option value="ผู้">ผู้</option><option value="เมีย">เมีย</option></select>
+          </div>
+          <div class="form-group"><label>อายุ</label><input type="text" id="petAge" class="form-control" placeholder="1 ปี"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>สายพันธุ์</label><input type="text" id="petBreed" class="form-control" value="ไทย"></div>
+          <div class="form-group"><label>สี/ตำหนิ</label><input type="text" id="petColor" class="form-control"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>ทำหมัน</label>
+            <select id="petNeuter" class="form-control"><option value="ยังไม่ทำหมัน">ยังไม่ทำหมัน</option><option value="ทำหมันแล้ว">ทำหมันแล้ว</option></select>
+          </div>
+          <div class="form-group"><label>ลักษณะการเลี้ยง</label>
+            <select id="petRearing" class="form-control">
+              <option value="เลี้ยงแบบปล่อยตลอดเวลา">แบบปล่อยตลอดเวลา</option>
+              <option value="เลี้ยงในพื้นที่จำกัดตลอดเวลา">พื้นที่จำกัดตลอดเวลา</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-outline" onclick="addPetToList()"><span class="material-icons">add</span> เพิ่มลงรายการเตรียมบันทึก</button>
+      </div>
+
+      <div id="newPetsListContainer"></div>
+
+      <div class="fab-container" id="fabSaveAction">
+        <button class="save-btn" onclick="saveCombinedData()">
+          <span class="material-icons">save</span> บันทึกข้อมูลและอัปเดตวัคซีน
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= TAB 2: ใบรับรอง ================= -->
+    <div id="certTab" class="tab-content">
+      <div class="card-box">
+        <div class="section-title"><span class="material-icons" style="font-size:16px;">description</span> 1. สร้างรายตัว</div>
+        <p style="font-size:11px; color:#666;">คลิกเลือก 1 แถวใน Google Sheet ก่อนกดปุ่มนี้</p>
+        <button class="btn-outline" onclick="runCert('manualGenerateCert')">สร้างจากแถวที่เลือก</button>
+      </div>
+      <div class="card-box">
+        <div class="section-title"><span class="material-icons" style="font-size:16px;">groups</span> 2. สร้างรายหมู่ (รวมเป็น PDF เดียว)</div>
+        <div class="input-group">
+          <input type="number" id="certMoo" class="form-control" placeholder="ระบุเลขหมู่" style="margin-bottom:0;">
+          <button class="search-btn" onclick="runCert('batchPrintMoo', document.getElementById('certMoo').value)">สร้าง</button>
+        </div>
+      </div>
+      <div class="card-box">
+        <div class="section-title"><span class="material-icons" style="font-size:16px;">reorder</span> 3. สร้างตามช่วงแถว (รวมเป็นหมู่)</div>
+        <p style="font-size:11px; color:#666;">ระบบจะจัดกลุ่มข้อมูลเป็น 1 PDF ต่อ 1 หมู่ให้</p>
+        <div class="grid-2">
+          <input type="number" id="startR" class="form-control" placeholder="เริ่ม (เช่น 2)">
+          <input type="number" id="endR" class="form-control" placeholder="สิ้นสุด (เช่น 100)">
+        </div>
+        <button class="btn-outline" onclick="runCert('generateByRange', document.getElementById('startR').value, document.getElementById('endR').value)">เริ่มจัดกลุ่มและสร้าง PDF</button>
+      </div>
+    </div>
+
+    <div id="toast"><span class="material-icons" id="toast-icon"></span><span id="toast-desc"></span></div>
+
+    <script>
+      let currentHhKey = '';
+      let isNewHousehold = false;
+      let newPetsArray = [];
+      let rowsToDelete = []; // ตะกร้าเก็บแถวที่ถูกมาร์คว่า "จะลบ"
+
+      function openTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+        document.getElementById('fabSaveAction').style.display = (tabId === 'mainTab' && currentHhKey !== '') ? 'block' : 'none';
+      }
+
+      function showToast(m, type = 'success') {
+        var t = document.getElementById("toast"); t.className = "show " + type;
+        document.getElementById("toast-desc").innerText = m;
+        document.getElementById("toast-icon").innerText = type === 'error' ? 'error_outline' : 'check_circle';
+        setTimeout(() => t.classList.remove("show"), 3000);
+      }
+
+      function showLoading(title, desc) {
+        document.getElementById('loadingTitle').innerText = title;
+        document.getElementById('loadingDesc').innerText = desc;
+        document.getElementById('loadingOverlay').style.display = 'flex';
+      }
+      function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
+
+      // ================= ค้นหาอัจฉริยะ =================
+      function searchData() {
+        var key = document.getElementById('searchInput').value.trim(); 
+        if(!key) return;
+        
+        showLoading("กำลังค้นหาข้อมูล...", "กรุณารอสักครู่");
+        
+        google.script.run.withSuccessHandler(data => {
+          hideLoading();
+          currentHhKey = data.key || key; 
+          isNewHousehold = !data.found;   
+          newPetsArray = [];              
+          rowsToDelete = []; // รีเซ็ตตะกร้าลบ ทุกครั้งที่ค้นหาใหม่
+          renderNewPetsList();
+
+          var ws = document.getElementById('workspace-area');
+          var html = '';
+
+          html += `
+            <div class="card-box">
+              <div class="section-title"><span class="material-icons" style="font-size:16px;">home</span> ข้อมูลบ้าน/เจ้าของ</div>
+              ${data.found 
+                ? `<div style="padding:10px; background:#F5F5F5; border-radius:6px;">
+                     <strong style="color:var(--primary-dark);">${data.owner}</strong><br>
+                     <span style="font-size:12px; color:#666;">โทร: ${data.phone || '-'}</span>
+                   </div>`
+                : `<p style="font-size:11px; color:#D32F2F;">ไม่พบบ้านเลขที่นี้ในระบบ กรุณาลงทะเบียนใหม่</p>
+                   <div class="grid-2">
+                     <div class="form-group"><label>บ้านเลขที่ *</label><input type="text" id="regHouse" class="form-control" value="${key.split('-')[0] || ''}"></div>
+                     <div class="form-group"><label>หมู่ที่ *</label><input type="text" id="regMoo" class="form-control" value="${key.split('-')[1] || ''}"></div>
+                   </div>
+                   <div class="form-group"><label>ชื่อเจ้าของ *</label><input type="text" id="regOwner" class="form-control"></div>
+                   <div class="form-group"><label>เบอร์โทร (ใส่ 0 ได้)</label><input type="tel" id="regPhone" class="form-control"></div>`
+              }
+            </div>
+          `;
+
+          if (data.found && data.pets.length > 0) {
+            html += `<div class="section-title" style="margin-top:20px;">สัตว์เลี้ยงในระบบ (${data.pets.length} ตัว)</div>`;
+            data.pets.forEach((pet, i) => {
+              var isCat = (pet.type && pet.type.indexOf('แมว') > -1);
+              var icon = isCat ? 'cruelty_free' : 'pets'; 
+              var iconColor = isCat ? '#FF9800' : '#795548';
+              var isChecked = (pet.status === 'เคยฉีด' && pet.year == 2569) ? 'checked' : '';
+              var statusColor = (pet.status === 'เคยฉีด') ? 'var(--success)' : '#FF5722';
+              
+              html += `
+              <div class="pet-card ${isChecked ? 'selected' : ''}" id="card-${i}">
+                <div class="pet-icon" style="color: ${iconColor}"><span class="material-icons">${icon}</span></div>
+                <div class="pet-info">
+                  <div class="pet-name">${pet.name || 'ไม่ระบุชื่อ'}</div>
+                  <div class="pet-status">
+                    ${pet.type} ${pet.sex} | ทำหมัน: ${pet.neuter||'-'}<br>
+                    <span class="status-text" style="color:${statusColor}; font-weight:500;">สถานะ: ${pet.status||'-'}</span> (${pet.year||'-'})
+                  </div>
+                </div>
+                
+                <div class="pet-card-actions">
+                  <!-- ปุ่มถังขยะ เปลี่ยนเป็นระบบ Toggle Mark for Delete -->
+                  <button class="btn-trash" id="btn-del-${i}" onclick="toggleDeletePet('${pet.row}', ${i})" title="กดเพื่อเตรียมลบข้อมูล (ตาย/ย้าย)">
+                    <span class="material-icons" id="icon-del-${i}" style="font-size: 18px;">delete</span>
+                  </button>
+                  <div class="checkbox-wrapper">
+                    <label class="toggle">
+                      <input class="toggle-checkbox update-checkbox" type="checkbox" id="cb-${i}" ${isChecked} onchange="toggleCard(${i}, this)" data-row="${pet.row}">
+                      <div class="toggle-switch"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>`;
+            });
+          }
+
+          ws.innerHTML = html;
+          document.getElementById('addPetSection').style.display = 'block';
+          document.getElementById('fabSaveAction').style.display = 'block';
+
+        }).withFailureHandler(e => { hideLoading(); showToast("ค้นหาล้มเหลว", "error"); }).fetchHouseholdData(key);
+      }
+
+      function toggleCard(i, cb) { 
+        document.getElementById('card-' + i).classList.toggle('selected', cb.checked); 
+      }
+
+      // ================= ระบบ Soft Delete แบบ Batch =================
+      function toggleDeletePet(rowNum, index) {
+        let card = document.getElementById('card-' + index);
+        let icon = document.getElementById('icon-del-' + index);
+        let cb = document.getElementById('cb-' + index);
+        let idx = rowsToDelete.indexOf(String(rowNum));
+
+        if (idx > -1) {
+          // เคยติ๊กลบไว้แล้ว -> ยกเลิกการลบ (Undo)
+          rowsToDelete.splice(idx, 1);
+          card.classList.remove('marked-delete');
+          icon.innerText = 'delete';
+          icon.style.color = '';
+          cb.disabled = false; // ปลดล็อคให้ติ๊กวัคซีนได้
+        } else {
+          // ทำเครื่องหมาย "รอการลบ"
+          rowsToDelete.push(String(rowNum));
+          card.classList.add('marked-delete');
+          card.classList.remove('selected'); // ถอดสีเขียวออก
+          icon.innerText = 'undo';
+          icon.style.color = 'var(--danger)';
+          
+          // ยกเลิกการติ๊กวัคซีน (ถ้ามีการติ๊กค้างไว้)
+          cb.checked = false;
+          cb.disabled = true; // ล็อคไม่ให้ติ๊กวัคซีน
+        }
+      }
+
+      // ================= ตะกร้าสัตว์ใหม่ =================
+      function addPetToList() {
+        var name = document.getElementById('petName').value.trim(); if(!name) { showToast("ระบุชื่อสัตว์", "error"); return; }
+        newPetsArray.push({
+          name: name, type: document.getElementById('petType').value, sex: document.getElementById('petSex').value,
+          age: document.getElementById('petAge').value, breed: document.getElementById('petBreed').value,
+          color: document.getElementById('petColor').value, neuter: document.getElementById('petNeuter').value,
+          rearing: document.getElementById('petRearing').value
+        });
+        renderNewPetsList(); 
+        document.getElementById('petName').value = ''; 
+        document.getElementById('petColor').value = ''; 
+        document.getElementById('petAge').value = '';
+        document.getElementById('petName').focus();
+      }
+
+      function renderNewPetsList() {
+        var h = ''; 
+        if(newPetsArray.length > 0) {
+          h += `<div class="section-title" style="margin-top:20px;">รายการเตรียมบันทึกใหม่ (${newPetsArray.length} ตัว)</div>`;
+          newPetsArray.forEach((p, i) => {
+            h += `<div class="pet-item">
+                    <span><strong style="color:var(--primary-dark)">${p.name}</strong> (${p.type} ${p.sex}) <br> <small style="color:#777;">ทำหมัน: ${p.neuter}</small></span>
+                    <button class="btn-delete" onclick="newPetsArray.splice(${i},1);renderNewPetsList();"><span class="material-icons" style="font-size:16px;">delete</span></button>
+                  </div>`;
+          });
+        }
+        document.getElementById('newPetsListContainer').innerHTML = h;
+      }
+
+      // ================= บันทึกข้อมูลรวม (Unified Save) =================
+      function saveCombinedData() {
+        let hhData = {};
+        if (isNewHousehold) {
+          hhData.moo = document.getElementById('regMoo').value.trim();
+          hhData.houseNo = document.getElementById('regHouse').value.trim();
+          hhData.owner = document.getElementById('regOwner').value.trim();
+          hhData.phone = document.getElementById('regPhone').value.trim();
+          
+          if(!hhData.moo || !hhData.houseNo || !hhData.owner) { 
+            showToast("กรุณากรอกข้อมูลบ้านให้ครบถ้วน", "error"); return; 
+          }
+          currentHhKey = hhData.houseNo + "-" + hhData.moo; 
+        }
+
+        let updateRows = [];
+        document.querySelectorAll('.update-checkbox:checked').forEach(cb => {
+          updateRows.push(cb.getAttribute('data-row'));
+        });
+
+        // เช็คว่ามีภาระงานให้ทำไหม (ตัวที่เกิดใหม่ + ตัวที่ติ๊กวัคซีน + **ตัวที่เตรียมลบ**)
+        if (updateRows.length === 0 && newPetsArray.length === 0 && rowsToDelete.length === 0 && !isNewHousehold) {
+          showToast("ไม่พบการเปลี่ยนแปลงใดๆ", "error"); return;
+        }
+
+        let payload = {
+          hhKey: currentHhKey,
+          isNewHousehold: isNewHousehold,
+          household: hhData,
+          updateRows: updateRows,
+          newPets: newPetsArray,
+          deletedRows: rowsToDelete // <--- ส่งชุดข้อมูลการลบกลับไปด้วย
+        };
+
+        showLoading("กำลังประมวลผลข้อมูล...", "ระบบกำลังบันทึกและอัปเดตยอดรวมรวดเดียว\nกรุณารอสักครู่...");
+        google.script.run.withSuccessHandler(m => {
+          hideLoading(); 
+          showToast(m); 
+          document.getElementById('searchInput').value = currentHhKey; 
+          searchData(); // โหลดหน้าจอใหม่เพื่อให้ข้อมูลตรงกับ Server ล่าสุด
+        }).withFailureHandler(e => { hideLoading(); showToast("บันทึกไม่สำเร็จ", "error"); }).processHouseholdData(payload);
+      }
+
+      // ================= ใบรับรอง =================
+      function runCert(fn, a, b) {
+        if (fn === 'batchPrintMoo' && !a) { showToast("กรุณาระบุเลขหมู่", "error"); return; }
+        if (fn === 'generateByRange' && (!a || !b)) { showToast("กรุณาระบุช่วงแถวให้ครบถ้วน", "error"); return; }
+        showLoading("กำลังสร้างใบรับรอง...", "ระบบกำลังแปลงเป็น PDF และจัดกลุ่มตามหมู่\nอาจใช้เวลาหลายนาที ห้ามปิดหน้าต่างนี้!");
+        google.script.run
+          .withSuccessHandler(r => { hideLoading(); showToast("สร้างสำเร็จ! " + (r.success ? "จำนวน " + r.success + " แถว" : "")); })
+          .withFailureHandler(e => { hideLoading(); showToast(e.message, "error"); })[fn](a, b);
+      }
+    </script>
+  </body>
+</html>
