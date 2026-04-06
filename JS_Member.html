@@ -160,7 +160,7 @@
       var sosBtnText = isMissing ? '📢 แจ้งเจอแล้ว' : '🚨 แจ้งหาย';
       var sosBtnClass = isMissing ? 'btn-sos active' : 'btn-sos';
 
-      var vaxClass = (pet.VaccineStatus === 'ฉีดแล้ว') ? 'badge-success' : 'badge-danger';
+      var vaxClass = (pet.VaccineStatus === 'เคยฉีด') ? 'badge-success' : 'badge-danger';
       var neuClass = (pet.NeuteredStatus === 'ทำแล้ว') ? 'badge-success' : 'badge-warning';
       var sexIcon = (pet.Sex === 'เพศผู้') ? '♂️' : '♀️';
 
@@ -270,8 +270,8 @@
               '<div class="form-group">' +
                 '<label>วัคซีนพิษสุนัขบ้า</label>' +
                 '<select id="batch-vax" class="form-input" onchange="toggleBatchVaxYear(this.value)">' +
-                  '<option value="ฉีดแล้ว">ฉีดแล้ว</option>' +
-                  '<option value="ยังไม่ฉีด">ยังไม่ฉีด</option>' +
+                  '<option value="เคยฉีด">เคยฉีด</option>' +
+                  '<option value="ไม่เคยฉีด">ไม่เคยฉีด</option>' +
                   '<option value="ไม่ทราบ">ไม่ทราบ</option>' +
                 '</select>' +
               '</div>' +
@@ -299,7 +299,7 @@
     modalContainer.innerHTML = html;
     modalContainer.style.display = 'flex';
     modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal);
-    toggleBatchVaxYear("ฉีดแล้ว");
+    toggleBatchVaxYear("เคยฉีด");
   }
 
   function handleBatchImageSelect(input) {
@@ -312,7 +312,7 @@
     }
   }
 
-  function toggleBatchVaxYear(val) { var div = document.getElementById('div-batch-vax-year'); if(div) div.style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+  function toggleBatchVaxYear(val) { var div = document.getElementById('div-batch-vax-year'); if(div) div.style.display = (val === 'เคยฉีด') ? 'block' : 'none'; }
   
   function addTempMemberPet() { 
     var name = document.getElementById('batch-name').value; if(!name){Swal.fire('กรุณาระบุชื่อสัตว์เลี้ยง');return;} 
@@ -333,7 +333,7 @@
         Breed:document.getElementById('batch-breed').value,
         ColorMark:document.getElementById('batch-color').value,
         VaccineStatus:vax,
-        VaccineYear:(vax==='ฉีดแล้ว')?vaxYear:'-',
+        VaccineYear:(vax==='เคยฉีด')?vaxYear:'-',
         NeuteredStatus:document.getElementById('batch-neuter').value,
         Location:document.getElementById('batch-location').value,
         RearingStyle:document.getElementById('batch-rearing').value,
@@ -366,7 +366,7 @@
     document.getElementById('batch-breed').value=item.Breed; 
     document.getElementById('batch-color').value=item.ColorMark; 
     document.getElementById('batch-vax').value=item.VaccineStatus; 
-    document.getElementById('batch-vax-year').value=(item.VaccineStatus==='ฉีดแล้ว')?item.VaccineYear:''; 
+    document.getElementById('batch-vax-year').value=(item.VaccineStatus==='เคยฉีด')?item.VaccineYear:''; 
     toggleBatchVaxYear(item.VaccineStatus); 
     document.getElementById('batch-neuter').value=item.NeuteredStatus; 
     document.getElementById('batch-location').value=item.Location; 
@@ -498,11 +498,11 @@
                 '<label>7. วัคซีนพิษสุนัขบ้า</label>' +
                 '<select id="pet-vax" class="form-input" required onchange="togglePetVaxYear(this.value)">' +
                     '<option value="ไม่ทราบ" ' + (petData.VaccineStatus === 'ไม่ทราบ' ? 'selected' : '') + '>ไม่ทราบ</option>' +
-                    '<option value="ฉีดแล้ว" ' + (petData.VaccineStatus === 'ฉีดแล้ว' ? 'selected' : '') + '>ฉีดแล้ว</option>' +
-                    '<option value="ยังไม่ฉีด" ' + (petData.VaccineStatus === 'ยังไม่ฉีด' ? 'selected' : '') + '>ยังไม่ฉีด</option>' +
+                    '<option value="เคยฉีด" ' + (petData.VaccineStatus === 'เคยฉีด' ? 'selected' : '') + '>เคยฉีด</option>' +
+                    '<option value="ไม่เคยฉีด" ' + (petData.VaccineStatus === 'ไม่เคยฉีด' ? 'selected' : '') + '>ไม่เคยฉีด</option>' +
                 '</select>' +
             '</div>' +
-            '<div class="form-group" id="div-pet-vax-year" style="display: ' + (petData.VaccineStatus === 'ฉีดแล้ว' ? 'block' : 'none') + ';">' +
+            '<div class="form-group" id="div-pet-vax-year" style="display: ' + (petData.VaccineStatus === 'เคยฉีด' ? 'block' : 'none') + ';">' +
                 '<label>8. ปี พ.ศ.</label>' +
                 '<input type="text" id="pet-vax-year" class="form-input" value="' + (petData.VaccineYear || '') + '">' +
             '</div>' +
@@ -535,7 +535,7 @@
     }
   }
 
-  function togglePetVaxYear(val) { var div = document.getElementById('div-pet-vax-year'); if(div) div.style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+  function togglePetVaxYear(val) { var div = document.getElementById('div-pet-vax-year'); if(div) div.style.display = (val === 'เคยฉีด') ? 'block' : 'none'; }
   function closePetModal() { modalContainer.style.display = 'none'; modalContainer.innerHTML = ''; }
   
   function handlePetFormSubmitWithImage(event) {

@@ -130,26 +130,167 @@
 
   /* --- 4. Dashboard & Cards --- */
   h2.dashboard-title { font-family: 'Kanit', sans-serif; font-size: 26px; font-weight: 600; margin-bottom: 20px; color: var(--col-hawthorne); }
-  .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 20px; }
   .dashboard-grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   
   .summary-card {
-    background-color: #ffffff; border-radius: 12px; padding: 25px;
-    box-shadow: var(--shadow-medium); color: white; position: relative; overflow: hidden;
+    background-color: #ffffff; border-radius: 24px; padding: 24px 24px 20px;
+    box-shadow: 0 18px 40px rgba(20, 35, 34, 0.08); color: white; position: relative; overflow: hidden;
+    min-height: 180px;
   }
-  /* Gradient Backgrounds */
-  .card-color-1 { background: linear-gradient(135deg, var(--col-hawthorne), var(--col-blue-noir)); }
-  .card-color-2 { background: linear-gradient(135deg, var(--col-royal), var(--col-hawthorne)); }
-  .card-color-3 { background: linear-gradient(135deg, var(--col-thistle), var(--col-hawthorne)); }
-  .card-color-4 { background: linear-gradient(135deg, var(--col-dusky-rose), var(--col-royal)); }
-  .card-color-5 { background: linear-gradient(135deg, var(--col-thistle), var(--col-blue-noir)); }
-  .card-color-6 { background: linear-gradient(135deg, var(--col-blue-noir), var(--col-royal)); }
+  .summary-card::before {
+    content: '';
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    right: -40px;
+    top: -40px;
+    opacity: 0.18;
+    background: rgba(255,255,255,0.35);
+  }
+  .summary-card::after {
+    content: '';
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    left: -25px;
+    bottom: -20px;
+    opacity: 0.14;
+    background: rgba(255,255,255,0.2);
+  }
+  .summary-card .card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .summary-card .card-icon {
+    font-size: 34px;
+    background: rgba(255,255,255,0.2);
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 6px rgba(255,255,255,0.25);
+  }
+  .summary-card .card-title { font-family: 'Kanit', sans-serif; font-size: 16px; font-weight: 500; opacity: 0.95; margin-bottom: 8px; }
+  .summary-card .card-value-main { font-family: 'Kanit', sans-serif; font-size: 36px; font-weight: 700; line-height: 1.05; color: #fff; }
+  .summary-card .card-value-main .unit { font-size: 16px; font-weight: 500; opacity: 0.85; }
+  .summary-card .card-footer { margin-top: 20px; font-family: 'Sarabun', sans-serif; font-size: 14px; opacity: 0.9; line-height: 1.6; }
+  .card-color-1 { background: linear-gradient(135deg, #3d5b50, #0f2927); }
+  .card-color-2 { background: linear-gradient(135deg, #5f3d6f, #2b1f3c); }
+  .card-color-3 { background: linear-gradient(135deg, #5a5b8a, #2b2f4f); }
+  .card-color-4 { background: linear-gradient(135deg, #d9a77a, #7b4c79); }
+  .card-color-5 { background: linear-gradient(135deg, #6f8b72, #2c4239); }
+  .card-color-6 { background: linear-gradient(135deg, #2c3a42, #122123); }
 
-  .card-title { font-family: 'Kanit', sans-serif; font-size: 18px; font-weight: 400; opacity: 0.9; color: inherit; margin-bottom: 5px; }
-  .card-value-main { font-family: 'Kanit', sans-serif; font-size: 42px; font-weight: 700; color: inherit; margin-top: 10px; }
-  .card-value-main .unit { font-size: 18px; font-weight: 400; opacity: 0.8; color: inherit; margin-left: 5px; }
-  .card-bg-icon { position: absolute; right: 15px; bottom: 5px; font-size: 80px; line-height: 1; opacity: 0.15; color: white; user-select: none; z-index: 0; pointer-events: none; }
-  .summary-card > * { position: relative; z-index: 1; }
+  /* Charts Section */
+  .charts-section { margin-top: 40px; }
+  .charts-section h3 { font-family: 'Kanit', sans-serif; font-size: 24px; font-weight: 700; color: var(--col-blue-noir); text-align: center; margin-bottom: 18px; letter-spacing: 0.5px; }
+  .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 20px; }
+  .chart-container {
+    background-color: #ffffff;
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow: 0 18px 35px rgba(22, 36, 37, 0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .chart-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .chart-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .chart-card-title {
+    font-family: 'Kanit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--col-blue-noir);
+  }
+  .chart-card-subtitle {
+    font-family: 'Sarabun', sans-serif;
+    font-size: 14px;
+    color: #6f7a86;
+    line-height: 1.5;
+    max-width: 70%;
+  }
+  .chart-card-body {
+    width: 100%;
+    position: relative;
+    min-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+  }
+  .chart-card-body canvas { width: 100% !important; height: 100% !important; max-height: 320px; }
+
+  .progress-card {
+    display: grid;
+    gap: 16px;
+  }
+  .progress-meta { font-family: 'Kanit', sans-serif; font-size: 0.98rem; color: #24323b; font-weight: 700; text-align: left; }
+  
+  /* Circular Progress */
+  .circular-progress {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin: 0 auto;
+  }
+  .progress-ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+  .progress-ring-bg {
+    fill: none;
+    stroke: #e8f0f5;
+    stroke-width: 8;
+  }
+  .progress-ring-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 339.3; /* 2 * π * 54 */
+    stroke-dashoffset: 339.3;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  #vaccination-ring {
+    stroke: url(#vacGradient);
+  }
+  #neuter-ring {
+    stroke: url(#neuterGradient);
+  }
+  .progress-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .progress-icon {
+    font-size: 32px;
+    line-height: 1;
+  }
+  .progress-percent {
+    font-family: 'Kanit', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--col-blue-noir);
+  }
 
   /* --- 5. Form Styles --- */
   .form-container { max-width: 500px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: var(--shadow-medium); padding: 30px 40px; }
@@ -230,10 +371,13 @@
     #main-menu-bar { padding: 10px; gap: 10px; }
     .menu-welcome { width: 100%; text-align: center; margin-right: 0; margin-bottom: 5px; border-bottom: 1px solid #eee; }
     .nav-button { flex: 1; justify-content: center; font-size: 14px; padding: 8px 10px; }
-    .dashboard-grid, .form-grid-4col, .dashboard-grid-2col, .form-grid, .admin-filter-bar { grid-template-columns: 1fr; }
+    .dashboard-grid, .form-grid-4col, .dashboard-grid-2col, .form-grid, .admin-filter-bar, .charts-grid { grid-template-columns: 1fr; }
     .admin-filter-bar .form-button { width: 100%; }
     .form-input { font-size: 16px; }
     .form-group { margin-bottom: 10px; }
     .form-container { padding: 20px; }
+    .chart-card-body { min-height: 220px; }
+    .chart-card-header { flex-direction: column; align-items: flex-start; }
+    .chart-card-subtitle { max-width: 100%; }
   }
 </style>

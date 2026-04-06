@@ -1,175 +1,323 @@
-<script>
+﻿<script>
   /**
-   * (อัปเดตล่าสุด: เพิ่มฟังก์ชันกดดูรูปใหญ่ในประกาศสัตว์หาย)
+   * Public Dashboard - แสดงข้อมูลภาพรวมสำหรับประชาชน
    */
   function loadPublicDashboard() {
-    toggleSidebar(false); 
-    const pageId = 'public-dashboard-page';
-    const pageDiv = document.getElementById(pageId);
-    if (!pageDiv) return;
+    try {
+      toggleSidebar(false); 
+      const pageId = 'public-dashboard-page';
+      const pageDiv = document.getElementById(pageId);
+      if (!pageDiv) {
+        console.error('Page div not found:', pageId);
+        return;
+      }
 
-    pageDiv.classList.add('page');
-    pageDiv.innerHTML = ""; 
-    showLoader(true);
-    
-    google.script.run
-      .withSuccessHandler(data => {
-        if (data.error) {
-          pageDiv.innerHTML = `<h2>เกิดข้อผิดพลาด: ${data.error}</h2>`;
+      pageDiv.classList.add('page');
+      pageDiv.innerHTML = ""; 
+      showLoader(true);
+      
+      if (!google || !google.script) {
+        console.error('Google Apps Script API not available');
+        pageDiv.innerHTML = '<h2>Google Apps Script API ไม่พร้อม</h2>';
+        showLoader(false);
+        return;
+      }
+      
+      google.script.run
+        .withSuccessHandler(data => {
+          if (data.error) {
+            pageDiv.innerHTML = '<h2>เกิดข้อผิดพลาด: ' + data.error + '</h2>';
+            showLoader(false);
+            return;
+          }
+
+          renderDashboardUI(pageDiv, data);
+          renderDashboardCharts(data);
+          navigateTo(pageId);
+          loadPublicLostPets();
           showLoader(false);
+        })
+        .withFailureHandler(error => {
+          console.error('Failed to get dashboard data:', error);
+          pageDiv.innerHTML = '<h2>เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + error.message + '</h2>';
+          showLoader(false);
+        })
+        .getPublicDashboardData();
+    } catch (err) {
+      console.error('Error in loadPublicDashboard:', err);
+      var pageDiv = document.getElementById('public-dashboard-page');
+      if (pageDiv) {
+        pageDiv.innerHTML = '<h2>เกิดข้อผิดพลาด: ' + err.message + '</h2>';
+      }
+      showLoader(false);
+    }
+  }
+
+  function renderDashboardUI(pageDiv, data) {
+    var html = '<h2 class="dashboard-title">ภาพรวมข้อมูลทั้งหมด</h2>';
+
+    // Lost pets section
+    html += '<div id="lost-pets-section" style="display:none; margin-bottom: 30px; border: 2px solid #d32f2f; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(211, 47, 47, 0.15);">';
+    html += '<div style="background: #d32f2f; color: white; padding: 12px 20px; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">';
+    html += '<span style="font-size: 1.4rem;">🚨</span> ประกาศตามหาสัตว์เลี้ยง (ช่วยกันสอดส่อง)';
+    html += '</div>';
+    html += '<div id="lost-pets-grid" class="pet-card-grid" style="padding: 20px; background: #fffafa;"></div>';
+    html += '</div>';
+
+    // Summary cards grid
+    html += '<div class="dashboard-grid">';
+    
+    html += '<div class="summary-card card-color-1">';
+    html += '<div class="card-row"><div>';
+    html += '<div class="card-title">จำนวนครัวเรือน</div>';
+    html += '<div class="card-value-main">' + (data.households || 0).toLocaleString() + ' <span class="unit">ครัวเรือน</span></div>';
+    html += '</div><div class="card-icon">🏠</div></div>';
+    html += '<div class="card-footer">ฐานข้อมูลครัวเรือนล่าสุด</div>';
+    html += '</div>';
+
+    html += '<div class="summary-card card-color-2">';
+    html += '<div class="card-row"><div>';
+    html += '<div class="card-title">จำนวนสุนัข</div>';
+    html += '<div class="card-value-main">' + (data.dogActual || 0).toLocaleString() + ' <span class="unit">ตัว</span></div>';
+    html += '</div><div class="card-icon">🐕</div></div>';
+    html += '<div class="card-footer">สัดส่วนสัตว์เลี้ยงหลัก</div>';
+    html += '</div>';
+
+    html += '<div class="summary-card card-color-3">';
+    html += '<div class="card-row"><div>';
+    html += '<div class="card-title">จำนวนแมว</div>';
+    html += '<div class="card-value-main">' + (data.catActual || 0).toLocaleString() + ' <span class="unit">ตัว</span></div>';
+    html += '</div><div class="card-icon">🐈</div></div>';
+    html += '<div class="card-footer">กลุ่มเติบโตเร็ว</div>';
+    html += '</div>';
+
+    html += '<div class="summary-card card-color-4">';
+    html += '<div class="card-row"><div>';
+    html += '<div class="card-title">จำนวนรวม</div>';
+    html += '<div class="card-value-main">' + (data.totalActual || 0).toLocaleString() + ' <span class="unit">ตัว</span></div>';
+    html += '</div><div class="card-icon">📊</div></div>';
+    html += '<div class="card-footer">รวมสุนัขและแมวทั้งหมด</div>';
+    html += '</div>';
+
+    html += '<div class="summary-card card-color-5">';
+    html += '<div class="card-row"><div>';
+    html += '<div class="card-title">ฉีดวัคซีนแล้ว</div>';
+    html += '<div class="card-value-main">' + (data.vaccinated || 0).toLocaleString() + ' <span class="unit">ตัว</span></div>';
+    html += '</div><div class="card-icon">💉</div></div>';
+    html += '<div class="card-footer">ข้อมูลจากปี 2569</div>';
+    html += '</div>';
+
+    html += '<div class="summary-card card-color-6">';
+    html += '<div class="card-row"><div>';
+    html += '<div class="card-title">ทำหมันแล้ว</div>';
+    html += '<div class="card-value-main">' + (data.neutered || 0).toLocaleString() + ' <span class="unit">ตัว</span></div>';
+    html += '</div><div class="card-icon">✨</div></div>';
+    html += '<div class="card-footer">ลดการขยายพันธุ์ในชุมชน</div>';
+    html += '</div>';
+
+    html += '</div>';
+
+    // Charts section
+    html += '<div class="charts-section" style="margin-top: 40px;">';
+    html += '<h3 style="text-align: center; margin-bottom: 20px;">แผงข้อมูลเชิงสถิติ</h3>';
+    html += '<div class="charts-grid">';
+
+    // Donut chart
+    html += '<div class="chart-container chart-card">';
+    html += '<div class="chart-card-header">';
+    html += '<div class="chart-card-title">Split Donut</div>';
+    html += '<div class="chart-card-subtitle">สัดส่วนสุนัขและแมว</div>';
+    html += '</div>';
+    html += '<div class="chart-card-body"><canvas id="pet-type-chart"></canvas></div>';
+    html += '</div>';
+
+    // Vaccination progress
+    html += '<div class="chart-container chart-card">';
+    html += '<div class="chart-card-header">';
+    html += '<div class="chart-card-title">อัตราการฉีดวัคซีน</div>';
+    html += '<div class="chart-card-subtitle">เป้าหมาย 100% สำหรับสัตว์ที่ลงทะเบียน</div>';
+    html += '</div>';
+    html += '<div class="chart-card-body">';
+    html += '<div class="circular-progress" id="vaccination-progress">';
+    html += '<svg viewBox="0 0 120 120" class="progress-ring">';
+    html += '<circle cx="60" cy="60" r="54" class="progress-ring-bg"></circle>';
+    html += '<circle cx="60" cy="60" r="54" class="progress-ring-fill" id="vaccination-ring" stroke="#6e9f86"></circle>';
+    html += '</svg>';
+    html += '<div class="progress-content">';
+    html += '<div class="progress-icon">🐕</div>';
+    html += '<div class="progress-percent" id="vaccination-percent">0%</div>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div id="vaccination-label" class="progress-meta"></div>';
+    html += '</div>';
+    html += '</div>';
+
+    // Neuter progress
+    html += '<div class="chart-container chart-card">';
+    html += '<div class="chart-card-header">';
+    html += '<div class="chart-card-title">อัตราการทำหมัน</div>';
+    html += '<div class="chart-card-subtitle">เครื่องชี้วัดการควบคุมสัตว์จรจัด</div>';
+    html += '</div>';
+    html += '<div class="chart-card-body">';
+    html += '<div class="circular-progress" id="neuter-progress">';
+    html += '<svg viewBox="0 0 120 120" class="progress-ring">';
+    html += '<circle cx="60" cy="60" r="54" class="progress-ring-bg"></circle>';
+    html += '<circle cx="60" cy="60" r="54" class="progress-ring-fill" id="neuter-ring" stroke="#8a6b8f"></circle>';
+    html += '</svg>';
+    html += '<div class="progress-content">';
+    html += '<div class="progress-icon">🐱</div>';
+    html += '<div class="progress-percent" id="neuter-percent">0%</div>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div id="neuter-label" class="progress-meta"></div>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '</div>';
+    html += '</div>';
+
+    // SVG gradients (must be in document)
+    var svgDefs = document.createElement('svg');
+    svgDefs.style.display = 'none';
+    svgDefs.innerHTML = '<defs><linearGradient id="vacGradient"><stop offset="0%" style="stop-color:#6e9f86"/><stop offset="100%" style="stop-color:#243e3d"/></linearGradient><linearGradient id="neuterGradient"><stop offset="0%" style="stop-color:#8a6b8f"/><stop offset="100%" style="stop-color:#3b2d4a"/></linearGradient></defs>';
+    
+    pageDiv.innerHTML = html;
+    pageDiv.appendChild(svgDefs);
+  }
+
+  function loadPublicLostPets() {
+    try {
+      google.script.run.withSuccessHandler(function(res) {
+        var container = document.getElementById('lost-pets-section');
+        var grid = document.getElementById('lost-pets-grid');
+        
+        if (!res || !res.success || !res.pets || res.pets.length === 0) {
+          if (container) container.style.display = 'none';
           return;
         }
 
-        let html = `<h2 class="dashboard-title">ภาพรวมข้อมูลทั้งหมด</h2>`;
+        if (!container || !grid) return;
 
-        // ส่วนแสดงประกาศสัตว์หาย
-        html += `
-          <div id="lost-pets-section" style="display:none; margin-bottom: 30px; border: 2px solid #d32f2f; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(211, 47, 47, 0.15);">
-            <div style="background: #d32f2f; color: white; padding: 12px 20px; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
-               <span style="font-size: 1.4rem;">🚨</span> ประกาศตามหาสัตว์เลี้ยง (ช่วยกันสอดส่อง)
-            </div>
-            <div id="lost-pets-grid" class="pet-card-grid" style="padding: 20px; background: #fffafa;"></div>
-          </div>
-        `;
-
-        // สร้าง HTML การ์ดสรุปยอด
-        html += `<div class="dashboard-grid">`;
-        
-        // การ์ด 1: ครัวเรือน
-        html += `
-          <div class="summary-card card-color-1">
-            <div class="card-title">จำนวนครัวเรือน</div>
-            <div class="card-value-main">${data.households.toLocaleString()} <span class="unit">ครัวเรือน</span></div>
-          </div>
-        `;
-        
-        // การ์ด 2: สุนัข
-        html += `
-          <div class="summary-card card-color-2">
-            <div class="card-title">จำนวนสุนัข</div>
-            <div class="card-value-main">${data.dogActual.toLocaleString()} <span class="unit">ตัว</span></div>
-          </div>
-        `;
-        
-        // การ์ด 3: แมว
-        html += `
-          <div class="summary-card card-color-3">
-            <div class="card-title">จำนวนแมว</div>
-            <div class="card-value-main">${data.catActual.toLocaleString()} <span class="unit">ตัว</span></div>
-          </div>
-        `;
-        
-        // การ์ด 4: รวม
-        html += `
-          <div class="summary-card card-color-4">
-            <div class="card-title">จำนวนรวม (สุนัข+แมว)</div>
-            <div class="card-value-main">${data.totalActual.toLocaleString()} <span class="unit">ตัว</span></div>
-          </div>
-        `;
-        
-        // การ์ด 5: วัคซีน
-        html += `
-          <div class="summary-card card-color-5">
-            <div class="card-title">ฉีดวัคซีนแล้ว (ที่ลงทะเบียน)</div>
-            <div class="card-value-main">${data.vaccinated.toLocaleString()} <span class="unit">ตัว</span></div>
-          </div>
-        `;
-        
-        // การ์ด 6: ทำหมัน
-        html += `
-          <div class="summary-card card-color-6">
-            <div class="card-title">ทำหมันแล้ว (ที่ลงทะเบียน)</div>
-            <div class="card-value-main">${data.neutered.toLocaleString()} <span class="unit">ตัว</span></div>
-          </div>
-        `;
-        
-        html += `</div>`; // ปิด .dashboard-grid
-
-        pageDiv.innerHTML = html;
-        navigateTo(pageId);
-        
-        // เรียกฟังก์ชันโหลดข้อมูลสัตว์หาย
-        loadPublicLostPets();
-        
-        showLoader(false);
-      })
-      .withFailureHandler(error => {
-        pageDiv.innerHTML = `<h2>เกิดข้อผิดพลาดในการเชื่อมต่อ: ${error.message}</h2>`;
-        showLoader(false);
-      })
-      .getPublicDashboardData();
-  }
-
-  // ฟังก์ชันดึงข้อมูลสัตว์หายมาแสดง
-  function loadPublicLostPets() {
-    google.script.run.withSuccessHandler(res => {
-      const container = document.getElementById('lost-pets-section');
-      const grid = document.getElementById('lost-pets-grid');
-      
-      if (res.success && res.pets.length > 0) {
         container.style.display = 'block';
-        let html = '';
+        var html = '';
         
-        res.pets.forEach(pet => {
-          // จัดการรูปภาพ
-          let imgHtml = '';
-          if (pet.PetImage && pet.PetImage.toString().startsWith('http')) {
-             // ✅ เพิ่ม onclick และ cursor:pointer เพื่อให้รู้ว่ากดได้
-             imgHtml = `<img src="${pet.PetImage}" 
-                             style="width:100%; height:220px; object-fit:cover; display:block; cursor:pointer;" 
-                             onclick="viewImage('${pet.PetImage}')" 
-                             title="คลิกเพื่อดูภาพขยาย">`;
+        res.pets.forEach(function(pet) {
+          var imgHtml = '';
+          if (pet.PetImage && typeof pet.PetImage === 'string' && pet.PetImage.startsWith('http')) {
+            imgHtml = '<img src="' + pet.PetImage + '" style="width:100%; height:220px; object-fit:cover; display:block; cursor:pointer;" onclick="viewImage(\'' + pet.PetImage.replace(/'/g, "\\'") + '\')" title="คลิกเพื่อดูภาพขยาย">';
           } else {
-             imgHtml = `<div style="width:100%; height:220px; background:#f5f5f5; display:flex; align-items:center; justify-content:center; font-size:60px; color:#ddd;">${pet.PetType==='สุนัข'?'🐕':'🐈'}</div>`;
+            imgHtml = '<div style="width:100%; height:220px; background:#f5f5f5; display:flex; align-items:center; justify-content:center; font-size:60px; color:#ddd;">' + (pet.PetType === 'สุนัข' ? '🐕' : '🐈') + '</div>';
           }
 
-          html += `
-            <div class="pet-card missing-status" style="padding:0; overflow:hidden; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: #fff; border-radius: 12px;">
-               <div style="position: relative;">
-                 ${imgHtml}
-                 <div style="position: absolute; top: 10px; right: 10px; background: rgba(211, 47, 47, 0.9); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                    🚨 สูญหาย
-                 </div>
-               </div>
-               
-               <div style="padding:15px; text-align:left;">
-                  <div style="margin-bottom: 10px;">
-                    <div style="font-size: 0.85rem; color: #d32f2f; font-weight: bold; margin-bottom: 4px;">📍 หายบริเวณ:</div>
-                    <div style="font-size: 0.95rem; color: #333; line-height: 1.4;">${pet.MissingLocation || 'ไม่ระบุพิกัด'}</div>
-                  </div>
-                  
-                  <h3 style="margin: 0 0 5px 0; color: #333; font-size: 1.3rem;">${pet.PetName}</h3>
-                  <p style="font-size: 0.9rem; color: #666; margin: 0 0 15px 0;">
-                     พันธุ์: <strong>${pet.Breed}</strong> (${pet.Sex})<br>
-                     สี/ตำหนิ: ${pet.ColorMark}
-                  </p>
-                  
-                  <hr style="border:0; border-top:1px dashed #ddd; margin:10px 0;">
-                  
-                  <a href="tel:${pet.OwnerPhone}" style="display:block; text-align:center; background:#d32f2f; color:white; text-decoration:none; padding:10px; border-radius:8px; font-weight:bold; transition: background 0.2s;">
-                     📞 โทรแจ้งเจ้าของ
-                     <div style="font-size: 0.9rem; font-weight: normal; margin-top: 2px;">${pet.OwnerPhone}</div>
-                  </a>
-               </div>
-            </div>
-          `;
+          html += '<div class="pet-card missing-status" style="padding:0; overflow:hidden; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: #fff; border-radius: 12px;">';
+          html += '<div style="position: relative;">' + imgHtml;
+          html += '<div style="position: absolute; top: 10px; right: 10px; background: rgba(211, 47, 47, 0.9); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🚨 สูญหาย</div>';
+          html += '</div><div style="padding:15px; text-align:left;">';
+          html += '<div style="margin-bottom: 10px;"><div style="font-size: 0.85rem; color: #d32f2f; font-weight: bold; margin-bottom: 4px;">📍 หายบริเวณ:</div>';
+          html += '<div style="font-size: 0.95rem; color: #333; line-height: 1.4;">' + (pet.MissingLocation || 'ไม่ระบุพิกัด') + '</div></div>';
+          html += '<h3 style="margin: 0 0 5px 0; color: #333; font-size: 1.3rem;">' + pet.PetName + '</h3>';
+          html += '<p style="font-size: 0.9rem; color: #666; margin: 0 0 15px 0;">พันธุ์: <strong>' + pet.Breed + '</strong> (' + pet.Sex + ')<br>สี/ตำหนิ: ' + pet.ColorMark + '</p>';
+          html += '<hr style="border:0; border-top:1px dashed #ddd; margin:10px 0;">';
+          html += '<a href="tel:' + pet.OwnerPhone + '" style="display:block; text-align:center; background:#d32f2f; color:white; text-decoration:none; padding:10px; border-radius:8px; font-weight:bold; transition: background 0.2s;">';
+          html += '📞 โทรแจ้งเจ้าของ<div style="font-size: 0.9rem; font-weight: normal; margin-top: 2px;">' + pet.OwnerPhone + '</div>';
+          html += '</a></div></div>';
         });
         grid.innerHTML = html;
-      } else {
-        container.style.display = 'none';
-      }
-    }).getLostPetsPublic();
-  } 
+      }).getLostPetsPublic();
+    } catch (err) {
+      console.error('Error loading lost pets:', err);
+    }
+  }
 
-  // ✅ ฟังก์ชันแสดงภาพขนาดใหญ่ (เพิ่มใหม่สำหรับหน้า Public)
   function viewImage(url) {
-    Swal.fire({
-      imageUrl: url,
-      imageAlt: 'Pet Image',
-      showConfirmButton: false,
-      showCloseButton: true,
-      background: 'rgba(255, 255, 255, 0.95)',
-      backdrop: `rgba(0,0,0,0.4)`
-    });
+    try {
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          imageUrl: url,
+          imageAlt: 'Pet Image',
+          showConfirmButton: false,
+          showCloseButton: true,
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdrop: 'rgba(0,0,0,0.4)'
+        });
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      console.error('Error viewing image:', err);
+      window.open(url, '_blank');
+    }
+  }
+
+  function renderDashboardCharts(data) {
+    try {
+      // Donut chart
+      var petTypeCanvas = document.getElementById('pet-type-chart');
+      if (petTypeCanvas && typeof Chart !== 'undefined') {
+        var petTypeCtx = petTypeCanvas.getContext('2d');
+        new Chart(petTypeCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['สุนัข', 'แมว'],
+            datasets: [{
+              data: [data.dogActual || 0, data.catActual || 0],
+              backgroundColor: ['#283D3B', '#795663'],
+              hoverOffset: 8,
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            cutout: '60%',
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16 } },
+              datalabels: {
+                color: 'white',
+                font: { weight: 'bold', size: 16 },
+                formatter: function(value, ctx) {
+                  var sum = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                  return sum > 0 ? Math.round((value / sum) * 100) + '%' : '';
+                }
+              }
+            }
+          },
+          plugins: typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : []
+        });
+      }
+
+      // Vaccination progress
+      var vacPct = Math.round(data.vaccinationRate || 0);
+      var vacRing = document.getElementById('vaccination-ring');
+      var vacPercent = document.getElementById('vaccination-percent');
+      var vacLabel = document.getElementById('vaccination-label');
+      if (vacRing && vacPercent && vacLabel) {
+        var circumference = 2 * Math.PI * 54;
+        var offset = circumference - (vacPct / 100) * circumference;
+        vacRing.style.strokeDasharray = circumference;
+        vacRing.style.strokeDashoffset = offset;
+        vacRing.style.stroke = '#6e9f86';
+        vacRing.style.fill = 'none';
+        vacPercent.textContent = vacPct + '%';
+        vacLabel.textContent = 'ฉีดวัคซีนปี 2569: ' + vacPct + '% ของสัตว์ทั้งหมด';
+      }
+
+      // Neuter progress
+      var neuterPct = Math.round(data.neuterRate || 0);
+      var neuterRing = document.getElementById('neuter-ring');
+      var neuterPercent = document.getElementById('neuter-percent');
+      var neuterLabel = document.getElementById('neuter-label');
+      if (neuterRing && neuterPercent && neuterLabel) {
+        var circumference = 2 * Math.PI * 54;
+        var offset = circumference - (neuterPct / 100) * circumference;
+        neuterRing.style.strokeDasharray = circumference;
+        neuterRing.style.strokeDashoffset = offset;
+        neuterRing.style.stroke = '#8a6b8f';
+        neuterRing.style.fill = 'none';
+        neuterPercent.textContent = neuterPct + '%';
+        neuterLabel.textContent = 'ทำหมันแล้ว: ' + neuterPct + '% ของสัตว์ทั้งหมด';
+      }
+    } catch (err) {
+      console.error('Error rendering charts:', err);
+    }
   }
 </script>

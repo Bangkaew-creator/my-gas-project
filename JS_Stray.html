@@ -123,7 +123,7 @@
                  </div>
                  <div class="form-grid-4col" style="margin-top:10px;">
                     <div class="form-group" style="margin-bottom:5px;"><label>การทำหมัน</label><select id="temp-animal-neuter" class="form-input"><option value="ไม่ทราบ">ไม่ทราบ</option><option value="ยังไม่ทำ">ยังไม่ทำ</option><option value="ทำแล้ว">ทำแล้ว</option></select></div>
-                    <div class="form-group" style="margin-bottom:5px;"><label>วัคซีนพิษสุนัขบ้า</label><select id="temp-animal-vax" class="form-input" onchange="toggleVaxYear(this.value)"><option value="ยังไม่ฉีด/ไม่ทราบ">ยังไม่ฉีด/ไม่ทราบ</option><option value="ฉีดแล้ว">ฉีดแล้ว</option></select></div>
+                    <div class="form-group" style="margin-bottom:5px;"><label>วัคซีนพิษสุนัขบ้า</label><select id="temp-animal-vax" class="form-input" onchange="toggleVaxYear(this.value)"><option value="ไม่เคยฉีด">ไม่เคยฉีด</option><option value="เคยฉีด">เคยฉีด</option></select></div>
                     <div class="form-group" id="div-vax-year" style="margin-bottom:5px; display:none;"><label>ปีที่ฉีด (พ.ศ.)</label><input type="number" id="temp-animal-vax-year" class="form-input" placeholder="เช่น 2567"></div>
                  </div>
                  <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
@@ -257,7 +257,7 @@
       html += `<div class="stray-group-card"><div class="stray-group-header" onclick="toggleStrayGroup('${groupId}')"><div style="flex:1;"><div style="font-size:18px; font-weight:bold; color:#333;">📍 ${g.location}</div><div style="margin-top:5px; font-size:14px;"><span class="stat-badge bg-blue">รวม ${s.total}</span><span class="stat-badge bg-green">หมัน ${s.neutered}</span><span class="stat-badge bg-gray">ยัง ${s.notNeutered}</span></div></div><div style="font-size:20px; color:var(--col-royal);">▼</div></div><div id="${groupId}" class="stray-group-body">`;
       const isAdmin = (currentUser && currentUser.role === 'Admin');
       g.items.forEach(item => {
-        const icon = item.type === 'สุนัข' ? '🐕' : '🐈'; const vaxText = item.vaccine === 'ฉีดแล้ว' ? '💉 ฉีดแล้ว' : '⚠️ ยัง';
+        const icon = item.type === 'สุนัข' ? '🐕' : '🐈'; const vaxText = item.vaccine === 'เคยฉีด' ? '💉 เคยฉีด' : '⚠️ ไม่เคยฉีด';
         
         // ✅ เพิ่มส่วนแสดงรูปภาพในรายการ Feed
         let imgHtml = '';
@@ -276,7 +276,7 @@
   function toggleStrayGroup(id) { const el = document.getElementById(id); if (el) { if (el.classList.contains('expanded')) { el.classList.remove('expanded'); } else { el.classList.add('expanded'); } } }
 
   // --- Add/Edit Item in List Logic ---
-  function toggleVaxYear(val) { document.getElementById('div-vax-year').style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+  function toggleVaxYear(val) { document.getElementById('div-vax-year').style.display = (val === 'เคยฉีด') ? 'block' : 'none'; }
 
   function handleStrayImageSelect(input) {
     if (input.files && input.files[0]) {
@@ -301,11 +301,11 @@
     const imageBase64 = document.getElementById('stray-image-base64').value; // ✅ รับค่ารูป
     
     if (!color) { Swal.fire('ระบุสี/ตำหนิ'); return; }
-    if (vax === 'ฉีดแล้ว' && !vaxYear) { Swal.fire('ระบุปีที่ฉีดวัคซีน'); return; }
+    if (vax === 'เคยฉีด' && !vaxYear) { Swal.fire('ระบุปีที่ฉีดวัคซีน'); return; }
 
     let behaviorText = behaviorVal == "1" ? "ไม่เป็นมิตร" : (behaviorVal == "2" ? "เชื่องกับผู้ดูแล" : "เป็นมิตรมาก");
     
-    const animalObj = { type, color, gender, behavior: behaviorText, vaccine: vax, vaccineYear: (vax === 'ฉีดแล้ว') ? vaxYear : '-', neuter, image: imageBase64 };
+    const animalObj = { type, color, gender, behavior: behaviorText, vaccine: vax, vaccineYear: (vax === 'เคยฉีด') ? vaxYear : '-', neuter, image: imageBase64 };
 
     if (editingTempIndex === -1) {
        tempAnimalsList.push(animalObj);
@@ -317,10 +317,10 @@
     
     // Clear
     document.getElementById('temp-animal-color').value = '';
-    document.getElementById('temp-animal-vax').value = 'ยังไม่ฉีด/ไม่ทราบ';
+    document.getElementById('temp-animal-vax').value = 'ไม่เคยฉีด';
     document.getElementById('stray-image-base64').value = '';
     document.getElementById('stray-preview-image').src = 'https://via.placeholder.com/150?text=No+Image';
-    toggleVaxYear('ยังไม่ฉีด/ไม่ทราบ');
+    toggleVaxYear('ไม่เคยฉีด');
   }
   
   function editTempAnimal(index) {
@@ -332,7 +332,7 @@
      document.getElementById('temp-animal-neuter').value = item.neuter;
      document.getElementById('temp-animal-vax').value = item.vaccine;
      toggleVaxYear(item.vaccine);
-     if(item.vaccine === 'ฉีดแล้ว') document.getElementById('temp-animal-vax-year').value = item.vaccineYear;
+     if(item.vaccine === 'เคยฉีด') document.getElementById('temp-animal-vax-year').value = item.vaccineYear;
      
      let bVal = '3';
      if(item.behavior.includes('ไม่เป็นมิตร')) bVal = '1'; else if(item.behavior.includes('เชื่อง')) bVal = '2';
@@ -432,10 +432,10 @@
   // Admin Edit ... (Keep existing code)
   function openEditStrayModal(dogId, behav, vax, vaxYear, neuter) {
     let behavVal = '3'; if(behav.includes('ไม่เป็นมิตร')) behavVal = '1'; else if(behav.includes('เชื่อง')) behavVal = '2';
-    let html = `<div class="modal-overlay-close"></div><div class="modal-content" style="max-width: 400px;"><h3 class="form-title">แก้ไขข้อมูลสัตว์</h3><form id="edit-stray-form"><input type="hidden" id="edit-dog-id" value="${dogId}"><div class="form-group"><label>พฤติกรรม</label><select id="edit-behav" class="form-input"><option value="1-ไม่เป็นมิตร (จับไม่ได้)" ${behavVal=='1'?'selected':''}>ไม่เป็นมิตร (จับไม่ได้)</option><option value="2-เป็นมิตรเฉพาะผู้ดูแล" ${behavVal=='2'?'selected':''}>เป็นมิตรเฉพาะผู้ดูแล</option><option value="3-เป็นมิตร (ใครก็จับได้)" ${behavVal=='3'?'selected':''}>เป็นมิตร (ใครก็จับได้)</option></select></div><div class="form-group"><label>การทำหมัน</label><select id="edit-neuter" class="form-input"><option value="ไม่ทราบ" ${neuter=='ไม่ทราบ'?'selected':''}>ไม่ทราบ</option><option value="ยังไม่ทำ" ${neuter=='ยังไม่ทำ'?'selected':''}>ยังไม่ทำ</option><option value="ทำแล้ว" ${neuter=='ทำแล้ว'?'selected':''}>ทำแล้ว</option></select></div><div class="form-group"><label>วัคซีน</label><select id="edit-vax" class="form-input" onchange="toggleEditVaxYear(this.value)"><option value="ยังไม่ฉีด/ไม่ทราบ" ${vax.includes('ยัง')?'selected':''}>ยังไม่ฉีด/ไม่ทราบ</option><option value="ฉีดแล้ว" ${vax=='ฉีดแล้ว'?'selected':''}>ฉีดแล้ว</option></select></div><div class="form-group" id="edit-div-vax-year" style="display:${vax=='ฉีดแล้ว'?'block':'none'}"><label>ปีที่ฉีด</label><input type="number" id="edit-vax-year" class="form-input" value="${vaxYear}"></div><button type="submit" class="form-button">บันทึกการแก้ไข</button></form></div>`;
+    let html = `<div class="modal-overlay-close"></div><div class="modal-content" style="max-width: 400px;"><h3 class="form-title">แก้ไขข้อมูลสัตว์</h3><form id="edit-stray-form"><input type="hidden" id="edit-dog-id" value="${dogId}"><div class="form-group"><label>พฤติกรรม</label><select id="edit-behav" class="form-input"><option value="1-ไม่เป็นมิตร (จับไม่ได้)" ${behavVal=='1'?'selected':''}>ไม่เป็นมิตร (จับไม่ได้)</option><option value="2-เป็นมิตรเฉพาะผู้ดูแล" ${behavVal=='2'?'selected':''}>เป็นมิตรเฉพาะผู้ดูแล</option><option value="3-เป็นมิตร (ใครก็จับได้)" ${behavVal=='3'?'selected':''}>เป็นมิตร (ใครก็จับได้)</option></select></div><div class="form-group"><label>การทำหมัน</label><select id="edit-neuter" class="form-input"><option value="ไม่ทราบ" ${neuter=='ไม่ทราบ'?'selected':''}>ไม่ทราบ</option><option value="ยังไม่ทำ" ${neuter=='ยังไม่ทำ'?'selected':''}>ยังไม่ทำ</option><option value="ทำแล้ว" ${neuter=='ทำแล้ว'?'selected':''}>ทำแล้ว</option></select></div><div class="form-group"><label>วัคซีน</label><select id="edit-vax" class="form-input" onchange="toggleEditVaxYear(this.value)"><option value="ไม่เคยฉีด" ${vax==='ไม่เคยฉีด'?'selected':''}>ไม่เคยฉีด</option><option value="เคยฉีด" ${vax==='เคยฉีด'?'selected':''}>เคยฉีด</option></select></div><div class="form-group" id="edit-div-vax-year" style="display:${vax==='เคยฉีด'?'block':'none'}"><label>ปีที่ฉีด</label><input type="number" id="edit-vax-year" class="form-input" value="${vaxYear}"></div><button type="submit" class="form-button">บันทึกการแก้ไข</button></form></div>`;
     modalContainer.innerHTML = html; modalContainer.style.display = 'flex'; modalContainer.querySelector('.modal-overlay-close').addEventListener('click', closePetModal); document.getElementById('edit-stray-form').addEventListener('submit', handleEditStraySubmit);
   }
-  function toggleEditVaxYear(val) { document.getElementById('edit-div-vax-year').style.display = (val === 'ฉีดแล้ว') ? 'block' : 'none'; }
+  function toggleEditVaxYear(val) { document.getElementById('edit-div-vax-year').style.display = (val === 'เคยฉีด') ? 'block' : 'none'; }
   function handleEditStraySubmit(e) { e.preventDefault(); showLoader(true); const dogId = document.getElementById('edit-dog-id').value; const updateData = { behavior: document.getElementById('edit-behav').options[document.getElementById('edit-behav').selectedIndex].text, neuter: document.getElementById('edit-neuter').value, vaccine: document.getElementById('edit-vax').value, vaccineYear: document.getElementById('edit-vax-year').value }; if(updateData.behavior.includes('-')) updateData.behavior = updateData.behavior.split('-')[1]; google.script.run.withSuccessHandler(res => { showLoader(false); if(res.success) { closePetModal(); Swal.fire({icon:'success', title:'แก้ไขสำเร็จ', timer:1500, showConfirmButton:false}); loadPublicStrayFeed(); } else { Swal.fire('Error', res.message, 'error'); } }).adminUpdateStrayDog(dogId, updateData); }
   function closePetModal() { modalContainer.style.display = 'none'; modalContainer.innerHTML = ''; }
   function filterStrayList() { const query = document.getElementById('stray-search-input').value.toLowerCase(); const filtered = allStrayData.filter(item => { const text = (item.location + item.color + item.breed + item.type).toLowerCase(); return text.includes(query); }); renderGroupedStrayList(filtered); }

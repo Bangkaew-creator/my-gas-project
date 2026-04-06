@@ -32,10 +32,10 @@ function recalculateAndUpdateCounts(householdKey) {
         const vax = data[i][8] || ""; 
         const neuter = data[i][10] || "";
 
-        if (type === 'สุนัข' && sex === 'เพศผู้') { counters[0]++; if(vax==='ฉีดแล้ว')counters[1]++; if(neuter==='ทำแล้ว')counters[2]++; }
-        else if (type === 'สุนัข' && sex === 'เพศเมีย') { counters[3]++; if(vax==='ฉีดแล้ว')counters[4]++; if(neuter==='ทำแล้ว')counters[5]++; }
-        else if (type === 'แมว' && sex === 'เพศผู้') { counters[6]++; if(vax==='ฉีดแล้ว')counters[7]++; if(neuter==='ทำแล้ว')counters[8]++; }
-        else if (type === 'แมว' && sex === 'เพศเมีย') { counters[9]++; if(vax==='ฉีดแล้ว')counters[10]++; if(neuter==='ทำแล้ว')counters[11]++; }
+        if (type === 'สุนัข' && sex === 'เพศผู้') { counters[0]++; if(vax==='เคยฉีด')counters[1]++; if(neuter==='ทำแล้ว')counters[2]++; }
+        else if (type === 'สุนัข' && sex === 'เพศเมีย') { counters[3]++; if(vax==='เคยฉีด')counters[4]++; if(neuter==='ทำแล้ว')counters[5]++; }
+        else if (type === 'แมว' && sex === 'เพศผู้') { counters[6]++; if(vax==='เคยฉีด')counters[7]++; if(neuter==='ทำแล้ว')counters[8]++; }
+        else if (type === 'แมว' && sex === 'เพศเมีย') { counters[9]++; if(vax==='เคยฉีด')counters[10]++; if(neuter==='ทำแล้ว')counters[11]++; }
       }
     }
 
