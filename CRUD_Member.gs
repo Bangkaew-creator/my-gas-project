@@ -6,6 +6,32 @@
 // 🟢 ใส่ Folder ID สำหรับเก็บรูปสัตว์เลี้ยงมีเจ้าของ
 const BATCH_IMAGE_FOLDER_ID = '1zhIeIWoT2HmIlXDztHD69KmQsbW3UD7S'; 
 
+function normalizeNeuterStatus(value) {
+  const val = String(value || '').trim();
+  if (val === 'ทำหมันแล้ว' || val === 'ทำแล้ว') return 'ทำหมันแล้ว';
+  if (val === 'ยังไม่ทำหมัน' || val === 'ยังไม่ทำ' || val === 'ไม่ทราบ' || val === '') return 'ยังไม่ทำหมัน';
+  return 'ยังไม่ทำหมัน';
+}
+
+function normalizeVaccineStatus(value) {
+  const val = String(value || '').trim();
+  return val === 'เคยฉีด' ? 'เคยฉีด' : 'ไม่เคยฉีด';
+}
+
+function normalizeSex(value) {
+  const val = String(value || '').trim();
+  if (val === 'ผู้' || val === 'เพศผู้') return 'ผู้';
+  if (val === 'เมีย' || val === 'เพศเมีย') return 'เมีย';
+  return val;
+}
+
+function normalizePetType(value) {
+  const val = String(value || '').trim();
+  if (val === 'สุนัข') return 'สุนัข';
+  if (val === 'แมว') return 'แมว';
+  return val;
+}
+
 // --- 1. คำนวณยอด (Robust Version) ---
 function recalculateAndUpdateCounts(householdKey) {
   if (!householdKey) return;
@@ -29,13 +55,15 @@ function recalculateAndUpdateCounts(householdKey) {
         // Map Index (ระวัง: ต้องเช็คว่ามี index นี้จริงไหม)
         const type = data[i][3] || ""; 
         const sex = data[i][4] || "";
-        const vax = data[i][8] || ""; 
-        const neuter = data[i][10] || "";
+        const vax = normalizeVaccineStatus(data[i][9] || ""); 
+        const neuter = normalizeNeuterStatus(data[i][11] || "");
 
-        if (type === 'สุนัข' && sex === 'เพศผู้') { counters[0]++; if(vax==='เคยฉีด')counters[1]++; if(neuter==='ทำแล้ว')counters[2]++; }
-        else if (type === 'สุนัข' && sex === 'เพศเมีย') { counters[3]++; if(vax==='เคยฉีด')counters[4]++; if(neuter==='ทำแล้ว')counters[5]++; }
-        else if (type === 'แมว' && sex === 'เพศผู้') { counters[6]++; if(vax==='เคยฉีด')counters[7]++; if(neuter==='ทำแล้ว')counters[8]++; }
-        else if (type === 'แมว' && sex === 'เพศเมีย') { counters[9]++; if(vax==='เคยฉีด')counters[10]++; if(neuter==='ทำแล้ว')counters[11]++; }
+        const normalizedType = normalizePetType(type);
+        const normalizedSex = normalizeSex(sex);
+        if (normalizedType === 'สุนัข' && normalizedSex === 'ผู้') { counters[0]++; if(vax==='เคยฉีด')counters[1]++; if(neuter==='ทำหมันแล้ว')counters[2]++; }
+        else if (normalizedType === 'สุนัข' && normalizedSex === 'เมีย') { counters[3]++; if(vax==='เคยฉีด')counters[4]++; if(neuter==='ทำหมันแล้ว')counters[5]++; }
+        else if (normalizedType === 'แมว' && normalizedSex === 'ผู้') { counters[6]++; if(vax==='เคยฉีด')counters[7]++; if(neuter==='ทำหมันแล้ว')counters[8]++; }
+        else if (normalizedType === 'แมว' && normalizedSex === 'เมีย') { counters[9]++; if(vax==='เคยฉีด')counters[10]++; if(neuter==='ทำหมันแล้ว')counters[11]++; }
       }
     }
 
@@ -100,6 +128,10 @@ function getMemberPets(householdKey) {
         const rowData = data[i];
         const v = (idx) => (idx < rowData.length && rowData[idx] != null ? String(rowData[idx]) : "");
 
+        const ageYear = parseInt(v(7)) || 0;
+        const ageMonth = parseInt(v(8)) || 0;
+        const ageString = formatAgeString(ageYear, ageMonth);
+
         pets.push({
           PetID: v(0),
           HouseholdKey: v(1),
@@ -108,15 +140,17 @@ function getMemberPets(householdKey) {
           Sex: v(4),
           Breed: v(5),
           ColorMark: v(6),
-          Age: v(7),
-          VaccineStatus: v(8),
-          VaccineYear: v(9),
-          NeuteredStatus: v(10),
-          RearingStyle: v(11),
-          Location: v(12),
-          PetImage: v(18),       // S
-          PetStatus: v(19),      // T
-          MissingLocation: v(20) // U
+          Age: ageString,  // รวมปีและเดือนเป็น string
+          AgeYear: ageYear,
+          AgeMonth: ageMonth,
+          VaccineStatus: normalizeVaccineStatus(v(9)),
+          VaccineYear: v(10),
+          NeuteredStatus: normalizeNeuterStatus(v(11)),
+          RearingStyle: v(12),
+          Location: v(13),
+          PetImage: v(19),       // S
+          PetStatus: v(20),      // T
+          MissingLocation: v(21) // U
         });
       }
     }
@@ -155,6 +189,8 @@ function saveMemberPetsBatch(petsList, householdKey) {
 
     petsList.forEach(pet => {
       const newPetId = Utilities.getUuid();
+      const petType = normalizePetType(pet.PetType);
+      const petSex = normalizeSex(pet.Sex);
       
       let imageUrl = "";
       if (pet.PetImageBase64 && pet.PetImageBase64.length > 100) { 
@@ -162,9 +198,11 @@ function saveMemberPetsBatch(petsList, householdKey) {
       }
 
       newRows.push([
-        newPetId, householdKey, pet.PetName, pet.PetType, pet.Sex, 
-        pet.Breed, pet.ColorMark, pet.Age, pet.VaccineStatus, pet.VaccineYear, 
-        pet.NeuteredStatus, pet.RearingStyle, pet.Location, 
+        newPetId, householdKey, pet.PetName, petType, petSex, 
+        pet.Breed, pet.ColorMark, 
+        pet.AgeYear || 0, pet.AgeMonth || 0,  // แยกอายุเป็นปีและเดือน
+        normalizeVaccineStatus(pet.VaccineStatus), pet.VaccineYear, 
+        normalizeNeuterStatus(pet.NeuteredStatus), pet.RearingStyle, pet.Location, 
         "", "", "", "", "", 
         imageUrl, // Col S (19)
         "ปกติ",    // Col T (20)
@@ -221,12 +259,19 @@ function updatePet(petInfo, householdKey) {
     }
     if (row === -1) return { error: "ไม่พบ PetID" };
     
+    // Auto-expand columns if needed
+    const maxCol = petsSheet.getLastColumn();
+    if (maxCol < 22) {
+      petsSheet.insertColumnsAfter(maxCol, 22 - maxCol);
+    }
+    
     const updatedRowData = [
-      petInfo.PetName, petInfo.PetType, petInfo.Sex, petInfo.Breed, petInfo.ColorMark, 
-      petInfo.Age, petInfo.VaccineStatus, petInfo.VaccineYear, petInfo.NeuteredStatus, 
+      petInfo.PetName, normalizePetType(petInfo.PetType), normalizeSex(petInfo.Sex), petInfo.Breed, petInfo.ColorMark, 
+      petInfo.AgeYear || 0, petInfo.AgeMonth || 0,  // แยกอายุเป็นปีและเดือน
+      normalizeVaccineStatus(petInfo.VaccineStatus), petInfo.VaccineYear, normalizeNeuterStatus(petInfo.NeuteredStatus), 
       petInfo.RearingStyle, petInfo.Location
     ];
-    petsSheet.getRange(row, 3, 1, 11).setValues([updatedRowData]);
+    petsSheet.getRange(row, 3, 1, 12).setValues([updatedRowData]);
     recalculateAndUpdateCounts(householdKey);
     return { success: true };
   } catch (e) { return { error: e.message }; }
@@ -243,6 +288,25 @@ function deletePet(petId, householdKey) {
     if (row === -1) return { error: "ไม่พบ PetID" };
     petsSheet.deleteRow(row);
     recalculateAndUpdateCounts(householdKey);
+    return { success: true };
+  } catch (e) { return { error: e.message }; }
+}
+
+// --- Save Pet Image ---
+function savePetImage(base64, petId, householdKey) {
+  try {
+    const imageUrl = uploadImageToDrive(base64, petId);
+    if (!imageUrl) return { error: "อัปโหลดรูปภาพล้มเหลว" };
+    
+    const petsSheet = getPetsSheet();
+    const data = petsSheet.getRange("A:A").getValues();
+    let row = -1;
+    for(let i=0; i<data.length; i++) {
+        if(String(data[i][0]) === String(petId)) { row = i + 1; break; }
+    }
+    if (row === -1) return { error: "ไม่พบ PetID" };
+    
+    petsSheet.getRange(row, 20).setValue(imageUrl);
     return { success: true };
   } catch (e) { return { error: e.message }; }
 }

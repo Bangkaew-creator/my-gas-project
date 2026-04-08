@@ -49,24 +49,24 @@ function getPublicDashboardData() {
 
     stats.totalActual = stats.dogActual + stats.catActual;
 
-    // คำนวณ vaccinated ในปีปัจจุบัน (2569)
+    // คำนวณ vaccinated ในปีปัจจุบัน (2569) เท่านั้น
     const petSheet = getSpreadsheet().getSheetByName('Pets_Individual');
     const petData = petSheet.getDataRange().getValues();
     let vaccinatedCurrentYear = 0;
     for (let i = 1; i < petData.length; i++) {
-      if (String(petData[i][8]) === 'เคยฉีด' && String(petData[i][9]) === '2569') {
+      // Column J(index 9) = VaccineStatus, Column K(index 10) = VaccineYear
+      if (String(petData[i][9]) === 'เคยฉีด' && String(petData[i][10]) === '2569') {
         vaccinatedCurrentYear++;
       }
     }
-    stats.vaccinatedCurrentYear = vaccinatedCurrentYear;
-    stats.unvaccinatedCurrentYear = stats.totalActual - vaccinatedCurrentYear;
+    stats.vaccinated = vaccinatedCurrentYear;  // ใช้ vaccinated ในปี 2569 เท่านั้น
+    stats.unvaccinated = stats.totalActual - vaccinatedCurrentYear;
 
     // คำนวณอัตราเพิ่มเติมสำหรับกราฟ
-    stats.vaccinationRate = stats.totalActual > 0 ? (stats.vaccinatedCurrentYear / stats.totalActual) * 100 : 0;
+    stats.vaccinationRate = stats.totalActual > 0 ? (stats.vaccinated / stats.totalActual) * 100 : 0;
     stats.neuterRate = stats.totalActual > 0 ? (stats.neutered / stats.totalActual) * 100 : 0;
     stats.dogPercentage = stats.totalActual > 0 ? (stats.dogActual / stats.totalActual) * 100 : 0;
     stats.catPercentage = stats.totalActual > 0 ? (stats.catActual / stats.totalActual) * 100 : 0;
-    stats.unvaccinated = stats.totalActual - stats.vaccinated;
     stats.unvaccinatedPercentage = 100 - stats.vaccinationRate;
     
     // ส่ง target เป็น 0 ไปเลย เพื่อลดภาระ

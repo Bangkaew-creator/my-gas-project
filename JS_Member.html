@@ -161,7 +161,8 @@
       var sosBtnClass = isMissing ? 'btn-sos active' : 'btn-sos';
 
       var vaxClass = (pet.VaccineStatus === 'เคยฉีด') ? 'badge-success' : 'badge-danger';
-      var neuClass = (pet.NeuteredStatus === 'ทำแล้ว') ? 'badge-success' : 'badge-warning';
+      var neuterStatus = (pet.NeuteredStatus === 'ทำหมันแล้ว') ? 'ทำหมันแล้ว' : 'ยังไม่ทำหมัน';
+      var neuClass = (neuterStatus === 'ทำหมันแล้ว') ? 'badge-success' : 'badge-warning';
       var sexIcon = (pet.Sex === 'เพศผู้') ? '♂️' : '♀️';
 
       html += '<div class="' + cardClass + '" id="card-' + pet.PetID + '">' +
@@ -256,7 +257,15 @@
 
            '<div class="form-grid">' +
              '<div class="form-group"><label>ชื่อสัตว์เลี้ยง</label><input type="text" id="batch-name" class="form-input" placeholder="เช่น แดง"></div>' +
-             '<div class="form-group"><label>อายุ (เช่น 2 ปี)</label><input type="text" id="batch-age" class="form-input"></div>' +
+             '<div class="form-group">' +
+               '<label>อายุ</label>' +
+               '<div style="display: flex; gap: 8px; align-items: center;">' +
+                 '<input type="number" id="batch-age-year" class="form-input" placeholder="ปี" min="0" max="30" style="width: 60px;">' +
+                 '<span>ปี</span>' +
+                 '<input type="number" id="batch-age-month" class="form-input" placeholder="เดือน" min="0" max="11" style="width: 70px;">' +
+                 '<span>เดือน</span>' +
+               '</div>' +
+             '</div>' +
            '</div>' +
            '<div class="form-grid">' +
              '<div class="form-group"><label>ประเภท</label><div class="radio-button-group"><input type="radio" id="batch-type-dog" name="batch-type" value="สุนัข" checked><label for="batch-type-dog" class="radio-btn">🐕 สุนัข</label><input type="radio" id="batch-type-cat" name="batch-type" value="แมว"><label for="batch-type-cat" class="radio-btn">🐈 แมว</label></div></div>' +
@@ -272,7 +281,6 @@
                 '<select id="batch-vax" class="form-input" onchange="toggleBatchVaxYear(this.value)">' +
                   '<option value="เคยฉีด">เคยฉีด</option>' +
                   '<option value="ไม่เคยฉีด">ไม่เคยฉีด</option>' +
-                  '<option value="ไม่ทราบ">ไม่ทราบ</option>' +
                 '</select>' +
               '</div>' +
               '<div class="form-group" id="div-batch-vax-year">' +
@@ -281,7 +289,7 @@
               '</div>' +
            '</div>' +
            '<div class="form-grid">' +
-              '<div class="form-group"><label>การทำหมัน</label><select id="batch-neuter" class="form-input"><option value="ทำแล้ว">ทำแล้ว</option><option value="ยังไม่ทำ">ยังไม่ทำ</option><option value="ไม่ทราบ">ไม่ทราบ</option></select></div>' +
+              '<div class="form-group"><label>การทำหมัน</label><select id="batch-neuter" class="form-input"><option value="ทำหมันแล้ว">ทำหมันแล้ว</option><option value="ยังไม่ทำหมัน">ยังไม่ทำหมัน</option></select></div>' +
               '<div class="form-group"><label>สถานที่เลี้ยง</label><select id="batch-location" class="form-input"><option value="บ้านพักอาศัย">บ้านพักอาศัย</option><option value="สถานที่เอกชน">สถานที่เอกชน</option><option value="เลี้ยงบริเวณหมู่บ้าน">เลี้ยงบริเวณหมู่บ้าน</option></select></div>' +
            '</div>' +
            '<div class="form-group"><label>ลักษณะการเลี้ยง</label><select id="batch-rearing" class="form-input"><option value="เลี้ยงในพื้นที่จำกัดตลอดเวลา">เลี้ยงในพื้นที่จำกัดตลอดเวลา</option><option value="เลี้ยงในพื้นที่จำกัดบางเวลา">เลี้ยงในพื้นที่จำกัดบางเวลา</option><option value="เลี้ยงแบบปล่อยตลอดเวลา">เลี้ยงแบบปล่อยตลอดเวลา</option></select></div>' +
@@ -327,7 +335,8 @@
 
     var petObj={
         PetName:name,
-        Age:document.getElementById('batch-age').value,
+        AgeYear:parseInt(document.getElementById('batch-age-year').value) || 0,
+        AgeMonth:parseInt(document.getElementById('batch-age-month').value) || 0,
         PetType:type,
         Sex:sex,
         Breed:document.getElementById('batch-breed').value,
@@ -352,7 +361,8 @@
     document.getElementById('batch-name').value=''; 
     document.getElementById('batch-breed').value=''; 
     document.getElementById('batch-color').value=''; 
-    document.getElementById('batch-age').value='';
+    document.getElementById('batch-age-year').value=''; 
+    document.getElementById('batch-age-month').value=''; 
     if(imgEl) imgEl.value = '';
     var previewEl = document.getElementById('batch-preview-image');
     if(previewEl) previewEl.src = "https://via.placeholder.com/150?text=No+Image";
@@ -362,7 +372,8 @@
     var item=tempMemberPets[index]; 
     editingMemberPetIndex=index; 
     document.getElementById('batch-name').value=item.PetName; 
-    document.getElementById('batch-age').value=item.Age; 
+    document.getElementById('batch-age-year').value=item.AgeYear || 0; 
+    document.getElementById('batch-age-month').value=item.AgeMonth || 0; 
     document.getElementById('batch-breed').value=item.Breed; 
     document.getElementById('batch-color').value=item.ColorMark; 
     document.getElementById('batch-vax').value=item.VaccineStatus; 
@@ -405,7 +416,8 @@
     document.getElementById('batch-name').value=''; 
     document.getElementById('batch-breed').value=''; 
     document.getElementById('batch-color').value=''; 
-    document.getElementById('batch-age').value='';
+    document.getElementById('batch-age-year').value=''; 
+    document.getElementById('batch-age-month').value=''; 
     document.getElementById('batch-pet-image-base64').value='';
     document.getElementById('batch-preview-image').src = "https://via.placeholder.com/150?text=No+Image";
   }
@@ -482,10 +494,10 @@
           '<input type="hidden" id="pet-id" value="' + petData.PetID + '">' +
           '<div class="form-grid">' +
             '<div class="form-group"><label>1. ชื่อสัตว์เลี้ยง</label><input type="text" id="pet-name" class="form-input" required value="' + petData.PetName + '"></div>' +
-            '<div class="form-group"><label>6. อายุ</label><input type="text" id="pet-age" class="form-input" value="' + petData.Age + '"></div>' +
+            '<div class="form-group"><label>2. อายุ</label><div style="display:flex; gap:8px; align-items:center;"><input type="number" id="pet-age-year" class="form-input" placeholder="ปี" min="0" value="' + (petData.AgeYear || 0) + '" style="width:80px;"><span>ปี</span><input type="number" id="pet-age-month" class="form-input" placeholder="เดือน" min="0" max="11" value="' + (petData.AgeMonth || 0) + '" style="width:80px;"><span>เดือน</span></div></div>' +
           '</div>' +
           '<div class="form-grid">' +
-            '<div class="form-group"><label>2. ประเภท</label><div class="radio-button-group"><input type="radio" id="pet-type-dog" name="pet-type" value="สุนัข" ' + typeDogChecked + ' required><label for="pet-type-dog" class="radio-btn">🐕 สุนัข</label><input type="radio" id="pet-type-cat" name="pet-type" value="แมว" ' + typeCatChecked + '><label for="pet-type-cat" class="radio-btn">🐈 แมว</label></div></div>' +
+            '<div class="form-group"><label>3. ประเภท</label><div class="radio-button-group"><input type="radio" id="pet-type-dog" name="pet-type" value="สุนัข" ' + typeDogChecked + ' required><label for="pet-type-dog" class="radio-btn">🐕 สุนัข</label><input type="radio" id="pet-type-cat" name="pet-type" value="แมว" ' + typeCatChecked + '><label for="pet-type-cat" class="radio-btn">🐈 แมว</label></div></div>' +
             '<div class="form-group"><label>3. เพศ</label><div class="radio-button-group"><input type="radio" id="pet-sex-male" name="pet-sex" value="เพศผู้" ' + sexMaleChecked + ' required><label for="pet-sex-male" class="radio-btn">♂️ ผู้</label><input type="radio" id="pet-sex-female" name="pet-sex" value="เพศเมีย" ' + sexFemaleChecked + '><label for="pet-sex-female" class="radio-btn">♀️ เมีย</label></div></div>' +
           '</div>' +
           '<div class="form-grid">' +
@@ -497,9 +509,8 @@
             '<div class="form-group">' +
                 '<label>7. วัคซีนพิษสุนัขบ้า</label>' +
                 '<select id="pet-vax" class="form-input" required onchange="togglePetVaxYear(this.value)">' +
-                    '<option value="ไม่ทราบ" ' + (petData.VaccineStatus === 'ไม่ทราบ' ? 'selected' : '') + '>ไม่ทราบ</option>' +
                     '<option value="เคยฉีด" ' + (petData.VaccineStatus === 'เคยฉีด' ? 'selected' : '') + '>เคยฉีด</option>' +
-                    '<option value="ไม่เคยฉีด" ' + (petData.VaccineStatus === 'ไม่เคยฉีด' ? 'selected' : '') + '>ไม่เคยฉีด</option>' +
+                    '<option value="ไม่เคยฉีด" ' + (petData.VaccineStatus !== 'เคยฉีด' ? 'selected' : '') + '>ไม่เคยฉีด</option>' +
                 '</select>' +
             '</div>' +
             '<div class="form-group" id="div-pet-vax-year" style="display: ' + (petData.VaccineStatus === 'เคยฉีด' ? 'block' : 'none') + ';">' +
@@ -507,7 +518,7 @@
                 '<input type="text" id="pet-vax-year" class="form-input" value="' + (petData.VaccineYear || '') + '">' +
             '</div>' +
           '</div>' +
-          '<div class="form-group"><label>9. การทำหมัน</label><select id="pet-neuter" class="form-input" required><option value="ไม่ทราบ" ' + (petData.NeuteredStatus === 'ไม่ทราบ' ? 'selected' : '') + '>ไม่ทราบ</option><option value="ทำแล้ว" ' + (petData.NeuteredStatus === 'ทำแล้ว' ? 'selected' : '') + '>ทำแล้ว</option><option value="ยังไม่ทำ" ' + (petData.NeuteredStatus === 'ยังไม่ทำ' ? 'selected' : '') + '>ยังไม่ทำ</option></select></div>' +
+          '<div class="form-group"><label>9. การทำหมัน</label><select id="pet-neuter" class="form-input" required><option value="ทำหมันแล้ว" ' + (petData.NeuteredStatus === 'ทำหมันแล้ว' ? 'selected' : '') + '>ทำหมันแล้ว</option><option value="ยังไม่ทำหมัน" ' + (petData.NeuteredStatus === 'ยังไม่ทำหมัน' ? 'selected' : '') + '>ยังไม่ทำหมัน</option></select></div>' +
           '<div class="form-group"><label>10. ลักษณะการเลี้ยง</label><select id="pet-rearing" class="form-input" required><option value="เลี้ยงในพื้นที่จำกัดตลอดเวลา" ' + (petData.RearingStyle === 'เลี้ยงในพื้นที่จำกัดตลอดเวลา' ? 'selected' : '') + '>เลี้ยงในพื้นที่จำกัดตลอดเวลา</option><option value="เลี้ยงในพื้นที่จำกัดบางเวลา" ' + (petData.RearingStyle === 'เลี้ยงในพื้นที่จำกัดบางเวลา' ? 'selected' : '') + '>เลี้ยงในพื้นที่จำกัดบางเวลา</option><option value="เลี้ยงแบบปล่อยตลอดเวลา" ' + (petData.RearingStyle === 'เลี้ยงแบบปล่อยตลอดเวลา' ? 'selected' : '') + '>เลี้ยงแบบปล่อยตลอดเวลา</option></select></div>' +
           '<div class="form-group"><label>11. สถานที่เลี้ยง</label><select id="pet-location" class="form-input" required><option value="บ้านพักอาศัย" ' + (petData.Location === 'บ้านพักอาศัย' ? 'selected' : '') + '>บ้านพักอาศัย</option><option value="สถานที่ราชการ" ' + (petData.Location === 'สถานที่ราชการ' ? 'selected' : '') + '>สถานที่ราชการ</option><option value="วัด" ' + (petData.Location === 'วัด' ? 'selected' : '') + '>วัด</option><option value="ตลาด" ' + (petData.Location === 'ตลาด' ? 'selected' : '') + '>ตลาด</option><option value="เลี้ยงบริเวณหมู่บ้าน" ' + (petData.Location === 'เลี้ยงบริเวณหมู่บ้าน' ? 'selected' : '') + '>เลี้ยงบริเวณหมู่บ้าน</option><option value="สถานที่เอกชน" ' + (petData.Location === 'สถานที่เอกชน' ? 'selected' : '') + '>สถานที่เอกชน</option></select></div>' +
           
@@ -553,7 +564,8 @@
       PetType: petType, Sex: sex, 
       Breed: document.getElementById('pet-breed').value, 
       ColorMark: document.getElementById('pet-color').value, 
-      Age: document.getElementById('pet-age').value, 
+      AgeYear: parseInt(document.getElementById('pet-age-year').value) || 0, 
+      AgeMonth: parseInt(document.getElementById('pet-age-month').value) || 0, 
       VaccineStatus: document.getElementById('pet-vax').value, 
       VaccineYear: document.getElementById('pet-vax-year').value, 
       NeuteredStatus: document.getElementById('pet-neuter').value, 

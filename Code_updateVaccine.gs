@@ -22,6 +22,43 @@ function showSidebar() {
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
+function normalizeNeuterStatus(value) {
+  const val = String(value || '').trim();
+  if (val === 'ทำหมันแล้ว' || val === 'ทำแล้ว') return 'ทำหมันแล้ว';
+  if (val === 'ยังไม่ทำหมัน' || val === 'ยังไม่ทำ' || val === 'ไม่ทราบ' || val === '') return 'ยังไม่ทำหมัน';
+  return 'ยังไม่ทำหมัน';
+}
+
+function normalizeVaccineStatus(value) {
+  const val = String(value || '').trim();
+  return val === 'เคยฉีด' ? 'เคยฉีด' : 'ไม่เคยฉีด';
+}
+
+function normalizeSex(value) {
+  const val = String(value || '').trim();
+  if (val === 'ผู้' || val === 'เพศผู้') return 'ผู้';
+  if (val === 'เมีย' || val === 'เพศเมีย') return 'เมีย';
+  return val;
+}
+
+function parseAgeString(ageStr) {
+  const yearMatch = ageStr.match(/(\d+)\s*ปี/);
+  const monthMatch = ageStr.match(/(\d+)\s*เดือน/);
+  let years = 0;
+  let months = 0;
+  if (yearMatch) years = parseInt(yearMatch[1]) || 0;
+  if (monthMatch) months = parseInt(monthMatch[1]) || 0;
+  if (!yearMatch && !monthMatch) {
+    const numMatch = ageStr.match(/(\d+)/);
+    if (numMatch) {
+      const num = parseInt(numMatch[1]);
+      if (ageStr.includes('เดือน')) months = num;
+      else years = num;
+    }
+  }
+  return { years, months };
+}
+
 // ==========================================
 // ส่วนที่ 1: ระบบค้นหาอัจฉริยะ (Smart Search)
 // ==========================================
@@ -54,10 +91,10 @@ function fetchHouseholdData(rawKey) {
         row: i + 1,        
         name: petData[i][2],  
         type: petData[i][3],  
-        sex: petData[i][4],   
-        status: petData[i][8], 
-        year: petData[i][9],
-        neuter: petData[i][10]
+        sex: normalizeSex(petData[i][4]),   
+        status: normalizeVaccineStatus(petData[i][9]), 
+        year: petData[i][10],
+        neuter: normalizeNeuterStatus(petData[i][11])
       });
     }
   }
@@ -69,27 +106,32 @@ function fetchHouseholdData(rawKey) {
 // ส่วนที่ 2: ระบบบันทึกแบบรวมศูนย์ (Unified Save / Batch Process)
 // ==========================================
 function processHouseholdData(payload) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const petSheet = ss.getSheetByName(CONFIG.PETS_SHEET);
-  const hhSheet = ss.getSheetByName(CONFIG.HOUSEHOLD_SHEET);
-  
-  const hhKey = payload.hhKey;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const petSheet = ss.getSheetByName(CONFIG.PETS_SHEET);
+    const hhSheet = ss.getSheetByName(CONFIG.HOUSEHOLD_SHEET);
+    
+    const hhKey = payload.hhKey;
+    if (!hhKey) throw new Error("ไม่มีข้อมูล HouseholdKey");
 
-  // 1. จัดการข้อมูลบ้านใหม่ (ถ้ามี)
-  if (payload.isNewHousehold) {
-    let hhRow = Array(33).fill("");
-    hhRow[0] = hhKey;              
-    hhRow[1] = payload.household.moo;      
-    hhRow[2] = payload.household.houseNo;  
-    hhRow[3] = payload.household.owner;    
-    hhRow[5] = "'" + payload.household.phone; 
-    hhRow[6] = "บริเวณบ้าน";         
-    hhRow[32] = "Member";   
-    hhSheet.appendRow(hhRow);
-  }
+    // 1. จัดการข้อมูลบ้านใหม่ (ถ้ามี)
+    if (payload.isNewHousehold) {
+      if (!payload.household || !payload.household.moo || !payload.household.houseNo || !payload.household.owner) {
+        throw new Error("ข้อมูลบ้านไม่ครบถ้วน (moo, houseNo, owner)");
+      }
+      let hhRow = Array(33).fill("");
+      hhRow[0] = hhKey;              
+      hhRow[1] = payload.household.moo;      
+      hhRow[2] = payload.household.houseNo;  
+      hhRow[3] = payload.household.owner;    
+      hhRow[5] = "'" + payload.household.phone; 
+      hhRow[6] = "บริเวณบ้าน";         
+      hhRow[32] = "Member";   
+      hhSheet.appendRow(hhRow);
+    }
 
   // 2. ลบข้อมูลสัตว์ (Soft Delete Batch) **เพิ่มใหม่ตาม Requirement**
-  if (payload.deletedRows && payload.deletedRows.length > 0) {
+  if (payload.deletedRows && Array.isArray(payload.deletedRows) && payload.deletedRows.length > 0) {
     payload.deletedRows.forEach(r => {
       petSheet.getRange(parseInt(r, 10), 22).setValue('ตาย/ย้าย/หาย');
     });
@@ -99,8 +141,9 @@ function processHouseholdData(payload) {
   if (payload.updateRows && payload.updateRows.length > 0) {
     payload.updateRows.forEach(r => { 
       // ป้องกันการอัปเดตวัคซีนให้กับตัวที่ถูกสั่งลบพร้อมกัน
-      if (!payload.deletedRows.includes(String(r))) {
-        petSheet.getRange(parseInt(r, 10), 9, 1, 2).setValues([['เคยฉีด', 2569]]); 
+      const deletedRowsArr = (Array.isArray(payload.deletedRows)) ? payload.deletedRows : [];
+      if (!deletedRowsArr.includes(String(r))) {
+        petSheet.getRange(parseInt(r, 10), 10, 1, 2).setValues([['เคยฉีด', 2569]]); 
       }
     });
   }
@@ -110,17 +153,21 @@ function processHouseholdData(payload) {
     let newRows = [];
     payload.newPets.forEach(p => {
       const petId = "PET" + Date.now().toString().slice(-6) + Math.floor(Math.random()*10);
-      let petRow = Array(13).fill(""); 
+      let petRow = [];  // ใช้ array โดยตรง ไม่ต้อง Array(22).fill("")
+      const parsedAge = parseAgeString(String(p.age || ""));
       petRow[0] = petId; petRow[1] = hhKey; petRow[2] = p.name; petRow[3] = p.type; 
-      petRow[4] = p.sex; petRow[5] = p.breed; petRow[6] = p.color; petRow[7] = p.age; 
-      petRow[8] = "เคยฉีด"; petRow[9] = 2569; petRow[10] = p.neuter; 
-      petRow[11] = p.rearing; petRow[12] = "บริเวณบ้าน";
+      petRow[4] = p.sex; petRow[5] = p.breed; petRow[6] = p.color; 
+      petRow[7] = parsedAge.years; petRow[8] = parsedAge.months; 
+      petRow[9] = "เคยฉีด"; petRow[10] = 2569; petRow[11] = normalizeNeuterStatus(p.neuter); 
+      petRow[12] = p.rearing; petRow[13] = "บริเวณบ้าน";
+      petRow[20] = "ปกติ";  // PetStatus = ปกติ เป็น default
       newRows.push(petRow);
     });
     
     if(newRows.length > 0){
       const lr = petSheet.getLastRow();
-      petSheet.getRange(lr + 1, 1, newRows.length, 13).setValues(newRows);
+      // newRows มี 21 columns (indices 0-20): PetID ถึง PetStatus
+      petSheet.getRange(lr + 1, 1, newRows.length, 21).setValues(newRows);
     }
   }
 
@@ -128,6 +175,16 @@ function processHouseholdData(payload) {
   recalculateHouseholdSummary(hhKey);
 
   return "บันทึกและอัปเดตระบบเรียบร้อยแล้ว";
+  } catch(e) {
+    Logger.log("ProcessHouseholdData Error: " + e.message);
+    // ยังคงคำนวณยอดใหม่แม้จะเกิดข้อผิดพลาด เพื่อป้องกันการนับผิด
+    try {
+      recalculateHouseholdSummary(payload.hhKey);
+    } catch(recalcError) {
+      Logger.log("Recalculate Error: " + recalcError.message);
+    }
+    throw new Error("บันทึกไม่สำเร็จ: " + e.message);
+  }
 }
 
 // ==========================================
@@ -147,10 +204,12 @@ function recalculateHouseholdSummary(hhKey) {
     let isNotDeleted = petData[i][21] !== 'ตาย/ย้าย/หาย';
 
     if (isMatch && isNotDeleted) {
-      let isDog = (petData[i][3] === 'สุนัข');
-      let isM = (petData[i][4] === 'ผู้');
-      let isVax = (petData[i][8] === 'เคยฉีด');
-      let isNeu = (petData[i][10] === 'ทำหมันแล้ว');
+      const normalizedType = String(petData[i][3] || '').trim();
+      const normalizedSex = normalizeSex(petData[i][4]);
+      let isDog = (normalizedType === 'สุนัข');
+      let isM = (normalizedSex === 'ผู้');
+      let isVax = (normalizeVaccineStatus(petData[i][9]) === 'เคยฉีด');
+      let isNeu = (normalizeNeuterStatus(petData[i][11]) === 'ทำหมันแล้ว');
 
       if (isDog && isM) { c.dm++; if(isVax) c.dmV++; if(isNeu) c.dmN++; }
       if (isDog && !isM) { c.df++; if(isVax) c.dfV++; if(isNeu) c.dfN++; }

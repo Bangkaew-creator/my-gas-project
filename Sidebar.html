@@ -124,12 +124,13 @@
           <div class="form-group"><label>เพศ</label>
             <select id="petSex" class="form-control"><option value="ผู้">ผู้</option><option value="เมีย">เมีย</option></select>
           </div>
-          <div class="form-group"><label>อายุ</label><input type="text" id="petAge" class="form-control" placeholder="1 ปี"></div>
+          <div class="form-group"><label>อายุ (ปี)</label><input type="number" id="petAgeYear" class="form-control" placeholder="0" min="0"></div>
         </div>
         <div class="grid-2">
+          <div class="form-group"><label>อายุ (เดือน)</label><input type="number" id="petAgeMonth" class="form-control" placeholder="0" min="0" max="11"></div>
           <div class="form-group"><label>สายพันธุ์</label><input type="text" id="petBreed" class="form-control" value="ไทย"></div>
-          <div class="form-group"><label>สี/ตำหนิ</label><input type="text" id="petColor" class="form-control"></div>
         </div>
+        <div class="form-group"><label>สี/ตำหนิ</label><input type="text" id="petColor" class="form-control" placeholder="เช่น ขาวดำ"></div>
         <div class="grid-2">
           <div class="form-group"><label>ทำหมัน</label>
             <select id="petNeuter" class="form-control"><option value="ยังไม่ทำหมัน">ยังไม่ทำหมัน</option><option value="ทำหมันแล้ว">ทำหมันแล้ว</option></select>
@@ -322,17 +323,28 @@
 
       // ================= ตะกร้าสัตว์ใหม่ =================
       function addPetToList() {
-        var name = document.getElementById('petName').value.trim(); if(!name) { showToast("ระบุชื่อสัตว์", "error"); return; }
+        var name = document.getElementById('petName').value.trim(); 
+        if(!name) { showToast("ระบุชื่อสัตว์", "error"); return; }
+        
+        var colorEl = document.getElementById('petColor');
+        var colorVal = colorEl ? colorEl.value : '';
+        
         newPetsArray.push({
-          name: name, type: document.getElementById('petType').value, sex: document.getElementById('petSex').value,
-          age: document.getElementById('petAge').value, breed: document.getElementById('petBreed').value,
-          color: document.getElementById('petColor').value, neuter: document.getElementById('petNeuter').value,
+          name: name, 
+          type: document.getElementById('petType').value, 
+          sex: document.getElementById('petSex').value,
+          age: (parseInt(document.getElementById('petAgeYear').value) || 0) + ' ปี ' + (parseInt(document.getElementById('petAgeMonth').value) || 0) + ' เดือน',
+          breed: document.getElementById('petBreed').value,
+          color: colorVal, 
+          neuter: document.getElementById('petNeuter').value,
           rearing: document.getElementById('petRearing').value
         });
         renderNewPetsList(); 
         document.getElementById('petName').value = ''; 
+        document.getElementById('petBreed').value = 'ไทย';
         document.getElementById('petColor').value = ''; 
-        document.getElementById('petAge').value = '';
+        document.getElementById('petAgeYear').value = ''; 
+        document.getElementById('petAgeMonth').value = '';
         document.getElementById('petName').focus();
       }
 
@@ -342,7 +354,7 @@
           h += `<div class="section-title" style="margin-top:20px;">รายการเตรียมบันทึกใหม่ (${newPetsArray.length} ตัว)</div>`;
           newPetsArray.forEach((p, i) => {
             h += `<div class="pet-item">
-                    <span><strong style="color:var(--primary-dark)">${p.name}</strong> (${p.type} ${p.sex}) <br> <small style="color:#777;">ทำหมัน: ${p.neuter}</small></span>
+                    <span><strong style="color:var(--primary-dark)">${p.name}</strong> (${p.type} ${p.sex}) <br> <small style="color:#777;">${p.color ? 'สี: ' + p.color + ' | ' : ''}ทำหมัน: ${p.neuter}</small></span>
                     <button class="btn-delete" onclick="newPetsArray.splice(${i},1);renderNewPetsList();"><span class="material-icons" style="font-size:16px;">delete</span></button>
                   </div>`;
           });
@@ -390,7 +402,11 @@
           showToast(m); 
           document.getElementById('searchInput').value = currentHhKey; 
           searchData(); // โหลดหน้าจอใหม่เพื่อให้ข้อมูลตรงกับ Server ล่าสุด
-        }).withFailureHandler(e => { hideLoading(); showToast("บันทึกไม่สำเร็จ", "error"); }).processHouseholdData(payload);
+        }).withFailureHandler(e => { 
+          hideLoading(); 
+          console.error("Save Error:", e); 
+          showToast("บันทึกไม่สำเร็จ: " + (e.message || e), "error"); 
+        }).processHouseholdData(payload);
       }
 
       // ================= ใบรับรอง =================
