@@ -118,9 +118,16 @@
     const loginButton = document.createElement('button');
     loginButton.id = 'nav-login-btn';
     loginButton.className = 'nav-button';
-    loginButton.innerHTML = `<span class="icon">🔑</span> เข้าสู่ระบบ/สมัครสมาชิก`;
+    loginButton.innerHTML = `<span class="icon">🔑</span> เข้าสู่ระบบ`;
     loginButton.addEventListener('click', loadLoginPage);
     mainMenuBar.appendChild(loginButton);
+    
+    const registerButton = document.createElement('button');
+    registerButton.id = 'nav-register-btn';
+    registerButton.className = 'nav-button';
+    registerButton.innerHTML = `<span class="icon">📝</span> สมัครสมาชิก`;
+    registerButton.addEventListener('click', loadRegisterPage);
+    mainMenuBar.appendChild(registerButton);
   }
 
   function handleLogout() {

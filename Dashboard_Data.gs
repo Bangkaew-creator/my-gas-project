@@ -15,9 +15,9 @@ function getPublicDashboardData() {
     
     if (lastRow < 2) return { households: 0, dogActual: 0, catActual: 0, totalActual: 0, vaccinated: 0, neutered: 0 };
 
-    // ดึงเฉพาะคอลัมน์ T-AE (ยอดจริงสะสม) มาคำนวณ
-    // T=Col 20
-    const statsData = householdSheet.getRange(2, 20, lastRow - 1, 12).getValues();
+    // นับจำนวนจาก Pets_Individual โดยตรงเพื่อความถูกต้อง
+    const petSheet = getSpreadsheet().getSheetByName('Pets_Individual');
+    const petData = petSheet.getDataRange().getValues();
     
     let stats = {
       households: lastRow - 1,
@@ -27,40 +27,28 @@ function getPublicDashboardData() {
       neutered: 0
     };
 
-    statsData.forEach(row => {
-      // row indices based on T-AE (12 columns):
-      // [0]=DogM, [1]=DogM_Vax, [2]=DogM_Neu
-      // [3]=DogF, [4]=DogF_Vax, [5]=DogF_Neu
-      // [6]=CatM, [7]=CatM_Vax, [8]=CatM_Neu
-      // [9]=CatF, [10]=CatF_Vax, [11]=CatF_Neu
-
-      // Dog = DogM(0) + DogF(3)
-      stats.dogActual += (Number(row[0])||0) + (Number(row[3])||0);
-      
-      // Cat = CatM(6) + CatF(9)
-      stats.catActual += (Number(row[6])||0) + (Number(row[9])||0);
-
-      // Vaccinated (1, 4, 7, 10)
-      stats.vaccinated += (Number(row[1])||0) + (Number(row[4])||0) + (Number(row[7])||0) + (Number(row[10])||0);
-
-      // Neutered (2, 5, 8, 11)
-      stats.neutered += (Number(row[2])||0) + (Number(row[5])||0) + (Number(row[8])||0) + (Number(row[11])||0);
-    });
-
-    stats.totalActual = stats.dogActual + stats.catActual;
-
-    // คำนวณ vaccinated ในปีปัจจุบัน (2569) เท่านั้น
-    const petSheet = getSpreadsheet().getSheetByName('Pets_Individual');
-    const petData = petSheet.getDataRange().getValues();
-    let vaccinatedCurrentYear = 0;
     for (let i = 1; i < petData.length; i++) {
-      // Column J(index 9) = VaccineStatus, Column K(index 10) = VaccineYear
-      if (String(petData[i][9]) === 'เคยฉีด' && String(petData[i][10]) === '2569') {
-        vaccinatedCurrentYear++;
+      const petType = String(petData[i][3] || '').trim(); // Column D
+      const petSex = String(petData[i][4] || '').trim(); // Column E
+      const vaxStatus = String(petData[i][9] || '').trim(); // Column J
+      const vaxYear = String(petData[i][10] || '').trim(); // Column K
+      const neuterStatus = String(petData[i][11] || '').trim(); // Column L
+      const petStatus = String(petData[i][20] || '').trim(); // Column U (PetStatus)
+
+      // นับเฉพาะสัตว์ที่ยังมีชีวิต (ไม่ใช่ ตาย/ย้าย/หาย)
+      if (petStatus !== 'ตาย/ย้าย/หาย') {
+        if (petType === 'สุนัข') {
+          if (petSex === 'ผู้' || petSex === 'เพศผู้' || petSex === 'เมีย' || petSex === 'เพศเมีย') stats.dogActual++;
+        } else if (petType === 'แมว') {
+          if (petSex === 'ผู้' || petSex === 'เพศผู้' || petSex === 'เมีย' || petSex === 'เพศเมีย') stats.catActual++;
+        }
+
+        if (vaxStatus === 'เคยฉีด' && vaxYear === '2569') stats.vaccinated++;
+        if (neuterStatus === 'ทำหมันแล้ว') stats.neutered++;
       }
     }
-    stats.vaccinated = vaccinatedCurrentYear;  // ใช้ vaccinated ในปี 2569 เท่านั้น
-    stats.unvaccinated = stats.totalActual - vaccinatedCurrentYear;
+
+    stats.totalActual = stats.dogActual + stats.catActual;
 
     // คำนวณอัตราเพิ่มเติมสำหรับกราฟ
     stats.vaccinationRate = stats.totalActual > 0 ? (stats.vaccinated / stats.totalActual) * 100 : 0;
