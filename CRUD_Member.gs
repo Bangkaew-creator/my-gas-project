@@ -292,24 +292,7 @@ function deletePet(petId, householdKey) {
   } catch (e) { return { error: e.message }; }
 }
 
-// --- Save Pet Image ---
-function savePetImage(base64, petId, householdKey) {
-  try {
-    const imageUrl = uploadImageToDrive(base64, petId);
-    if (!imageUrl) return { error: "อัปโหลดรูปภาพล้มเหลว" };
-    
-    const petsSheet = getPetsSheet();
-    const data = petsSheet.getRange("A:A").getValues();
-    let row = -1;
-    for(let i=0; i<data.length; i++) {
-        if(String(data[i][0]) === String(petId)) { row = i + 1; break; }
-    }
-    if (row === -1) return { error: "ไม่พบ PetID" };
-    
-    petsSheet.getRange(row, 20).setValue(imageUrl);
-    return { success: true };
-  } catch (e) { return { error: e.message }; }
-}
+// savePetImage is defined in ImageService.gs — removed duplicate here
 
 // --- Admin Functions ---
 function adminUpdateMemberDetails(householdKey, d) {

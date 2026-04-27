@@ -288,24 +288,37 @@ function getLostPetsPublic() {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     
-    // ⚠️ จุดสำคัญ: ต้องแก้เลข Index ให้ตรงกับคอลัมน์จริงใน Google Sheet
-    // สมมติ:
-    // Col S (Index 18) = รูปภาพ
-    // Col T (Index 19) = สถานะ (PetStatus) <-- ต้องเช็คว่าชีทจริงคุณอยู่คอลัมน์นี้ไหม
-    // Col U (Index 20) = สถานที่หาย (MissingLocation)
+    // Schema (0-indexed):
+    // Index 19 = ImageUrl (Col T)
+    // Index 20 = PetStatus (Col U) — 'ปกติ' or 'สูญหาย'
+    // Index 21 = MissingLocation (Col V)
     
-    const status = row[19]; // แก้เลขนี้ให้ตรงคอลัมน์ PetStatus
+    const status = row[20]; // PetStatus
 
     if (status === 'สูญหาย') {
+      // ดึงเบอร์โทรจาก Household_Data ผ่าน HouseholdKey (index 1)
+      const hhKey = String(row[1] || '');
+      let ownerPhone = '';
+      try {
+        const hhSheet = getHouseholdSheet();
+        const hhData = hhSheet.getDataRange().getValues();
+        for (let j = 1; j < hhData.length; j++) {
+          if (String(hhData[j][0]) === hhKey) {
+            ownerPhone = String(hhData[j][5] || '').replace(/^'/, '');
+            break;
+          }
+        }
+      } catch(e) {}
+
       lostPets.push({
-        PetName: row[2],       // Col C
-        PetType: row[3],       // Col D
-        Sex: row[4],           // Col E
-        Breed: row[5],         // Col F
-        ColorMark: row[6],     // Col G
-        OwnerPhone: row[15],   // Col P (เบอร์โทร)
-        PetImage: row[18],     // Col S (รูปภาพ)
-        MissingLocation: row[20] // Col U (สถานที่หาย)
+        PetName: row[2],          // Col C
+        PetType: row[3],          // Col D
+        Sex: row[4],              // Col E
+        Breed: row[5],            // Col F
+        ColorMark: row[6],        // Col G
+        OwnerPhone: ownerPhone,   // จาก Household_Data Col F
+        PetImage: row[19],        // Col T (ImageUrl)
+        MissingLocation: row[21]  // Col V (สถานที่หาย)
       });
     }
   }

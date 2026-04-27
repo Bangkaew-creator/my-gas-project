@@ -51,8 +51,8 @@ function updateImageUrlInSheet(petId, householdKey, url) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(petId)) {
-      // บันทึกลง Col S (Index 18)
-      sheet.getRange(i + 1, 19).setValue(url); 
+      // บันทึกลง Col T (Index 19, column 20) = ImageUrl
+      sheet.getRange(i + 1, 20).setValue(url); 
       break;
     }
   }

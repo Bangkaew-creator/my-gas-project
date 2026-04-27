@@ -22,42 +22,9 @@ function showSidebar() {
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
-function normalizeNeuterStatus(value) {
-  const val = String(value || '').trim();
-  if (val === 'ทำหมันแล้ว' || val === 'ทำแล้ว') return 'ทำหมันแล้ว';
-  if (val === 'ยังไม่ทำหมัน' || val === 'ยังไม่ทำ' || val === 'ไม่ทราบ' || val === '') return 'ยังไม่ทำหมัน';
-  return 'ยังไม่ทำหมัน';
-}
-
-function normalizeVaccineStatus(value) {
-  const val = String(value || '').trim();
-  return val === 'เคยฉีด' ? 'เคยฉีด' : 'ไม่เคยฉีด';
-}
-
-function normalizeSex(value) {
-  const val = String(value || '').trim();
-  if (val === 'ผู้' || val === 'เพศผู้') return 'ผู้';
-  if (val === 'เมีย' || val === 'เพศเมีย') return 'เมีย';
-  return val;
-}
-
-function parseAgeString(ageStr) {
-  const yearMatch = ageStr.match(/(\d+)\s*ปี/);
-  const monthMatch = ageStr.match(/(\d+)\s*เดือน/);
-  let years = 0;
-  let months = 0;
-  if (yearMatch) years = parseInt(yearMatch[1]) || 0;
-  if (monthMatch) months = parseInt(monthMatch[1]) || 0;
-  if (!yearMatch && !monthMatch) {
-    const numMatch = ageStr.match(/(\d+)/);
-    if (numMatch) {
-      const num = parseInt(numMatch[1]);
-      if (ageStr.includes('เดือน')) months = num;
-      else years = num;
-    }
-  }
-  return { years, months };
-}
+// normalizeNeuterStatus, normalizeVaccineStatus, normalizeSex are defined in CRUD_Member.gs
+// parseAgeString is defined in Code.gs
+// Removed duplicates to avoid "already declared" errors in Apps Script
 
 // ==========================================
 // ส่วนที่ 1: ระบบค้นหาอัจฉริยะ (Smart Search)
@@ -234,9 +201,34 @@ function recalculateHouseholdSummary(hhKey) {
 // ส่วนที่ 4: ระบบใบรับรอง (โค้ดเดิม)
 // ==========================================
 function manualGenerateCert() { const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.PETS_SHEET); const row = sheet.getActiveRange().getRow(); if (row < 2) throw new Error('เลือกแถวในชีทก่อน'); const data = sheet.getRange(row, 1, 1, 20).getValues()[0]; const info = mapPetData(data); const root = DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID); const folder = getOrCreateFolder(root, "หมู่ที่ " + info.moo); return executeCreatePDF(info, folder); }
-function batchPrintMoo(moo) { const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.PETS_SHEET); const pets = sheet.getDataRange().getValues().slice(1).filter(r => String(r[17]) == moo); if (!pets.length) throw new Error("ไม่พบข้อมูลหมู่ " + moo); pets.sort((a,b) => sortHouseNoDesc(a[1], b[1])); const root = DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID); const name = `Print_Moo_${moo}_(${new Date().toLocaleDateString('th-TH')})`; const copy = DriveApp.getFileById(CONFIG.TEMPLATE_ID).makeCopy(name, root); const pres = SlidesApp.openById(copy.getId()); const master = pres.getSlides()[0]; pets.forEach(r => { replaceTextInSlide(master.duplicate(), mapPetData(r)); }); master.remove(); pres.saveAndClose(); root.createFile(copy.getAs(MimeType.PDF)).setName(name + ".pdf"); copy.setTrashed(true); return { success: pets.length }; }
+function batchPrintMoo(moo) { const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.PETS_SHEET); const pets = sheet.getDataRange().getValues().slice(1).filter(r => { const parts = String(r[1]||'').split('-'); return parts.length >= 2 && parts[parts.length-1] === String(moo); }); if (!pets.length) throw new Error("ไม่พบข้อมูลหมู่ " + moo); pets.sort((a,b) => sortHouseNoDesc(a[1], b[1])); const root = DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID); const name = `Print_Moo_${moo}_(${new Date().toLocaleDateString('th-TH')})`; const copy = DriveApp.getFileById(CONFIG.TEMPLATE_ID).makeCopy(name, root); const pres = SlidesApp.openById(copy.getId()); const master = pres.getSlides()[0]; pets.forEach(r => { replaceTextInSlide(master.duplicate(), mapPetData(r)); }); master.remove(); pres.saveAndClose(); root.createFile(copy.getAs(MimeType.PDF)).setName(name + ".pdf"); copy.setTrashed(true); return { success: pets.length }; }
 function generateByRange(start, end) { const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.PETS_SHEET); const rangeData = sheet.getRange(start, 1, (end-start)+1, sheet.getLastColumn()).getValues(); let petsList = rangeData.filter(r => r[0] !== "").map(r => mapPetData(r)); if (petsList.length === 0) throw new Error('ไม่พบข้อมูล'); petsList.sort((a,b) => Number(a.moo) - Number(b.moo) || sortHouseNoDesc(a.hhKey, b.hhKey)); const groupedByMoo = {}; petsList.forEach(pet => { const mooStr = String(pet.moo); if (!groupedByMoo[mooStr]) groupedByMoo[mooStr] = []; groupedByMoo[mooStr].push(pet); }); const root = DriveApp.getFolderById(CONFIG.ROOT_FOLDER_ID); const mainFolder = root.createFolder(`ชุดพิมพ์ช่วงแถว_${start}-${end}_(${Utilities.formatDate(new Date(), "GMT+7", "HH.mm")})`); const templateFile = DriveApp.getFileById(CONFIG.TEMPLATE_ID); let successCount = 0; for (const moo in groupedByMoo) { const petsInMoo = groupedByMoo[moo]; const batchFileName = `Print_Moo_${moo}_(รวม ${petsInMoo.length} ใบ)`; const batchFile = templateFile.makeCopy(batchFileName, mainFolder); const batchPres = SlidesApp.openById(batchFile.getId()); const masterSlide = batchPres.getSlides()[0]; petsInMoo.forEach(info => { replaceTextInSlide(masterSlide.duplicate(), info); successCount++; }); masterSlide.remove(); batchPres.saveAndClose(); mainFolder.createFile(batchFile.getAs(MimeType.PDF)).setName(batchFileName + ".pdf"); batchFile.setTrashed(true); } return { success: successCount }; }
-function mapPetData(r) { return { id: r[0], hhKey: r[1], petName: r[2], petType: r[3], sex: r[4], breed: r[5], color: r[6], age: r[7], ownerName: r[13], address: r[14], tel: r[15], moo: r[17] }; }
+function mapPetData(r) {
+  // Schema (0-indexed): 0=PetID, 1=HouseholdKey, 2=PetName, 3=PetType, 4=Sex,
+  // 5=Breed, 6=ColorMark, 7=AgeYear, 8=AgeMonth, 9=VaccineStatus, 10=VaccineYear,
+  // 11=NeuteredStatus, 12=RearingStyle, 13=Location, 14-18=empty, 19=ImageUrl, 20=PetStatus
+  const hhKey = String(r[1] || '');
+  const keyParts = hhKey.split('-');
+  const moo = keyParts.length >= 2 ? keyParts[keyParts.length - 1] : '';
+  const houseNo = keyParts.length >= 2 ? keyParts.slice(0, -1).join('-') : hhKey;
+  const age = formatAgeString(Number(r[7]) || 0, Number(r[8]) || 0);
+  // ownerName/address/tel: ไม่มีใน Pets_Individual — ดึงจาก Household_Data
+  let ownerName = '', address = '', tel = '';
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hhSheet = ss.getSheetByName(CONFIG.HOUSEHOLD_SHEET);
+    const hhData = hhSheet.getDataRange().getValues();
+    for (let i = 1; i < hhData.length; i++) {
+      if (String(hhData[i][0]).replace(/\s+/g,'') === hhKey.replace(/\s+/g,'')) {
+        ownerName = String(hhData[i][3] || '');
+        address = String(hhData[i][6] || '');
+        tel = String(hhData[i][5] || '').replace(/^'/, '');
+        break;
+      }
+    }
+  } catch(e) {}
+  return { id: r[0], hhKey: hhKey, petName: r[2], petType: r[3], sex: r[4], breed: r[5], color: r[6], age: age, ownerName: ownerName, address: address, tel: tel, moo: moo };
+}
 function executeCreatePDF(info, folder) { const hNo = String(info.hhKey).split('-')[0]; const name = `${hNo}_${info.petName}_${info.id}`; const copy = DriveApp.getFileById(CONFIG.TEMPLATE_ID).makeCopy(name, folder); const pres = SlidesApp.openById(copy.getId()); replaceTextInSlide(pres.getSlides()[0], info); pres.saveAndClose(); folder.createFile(copy.getAs(MimeType.PDF)).setName(name + ".pdf"); copy.setTrashed(true); return { fileName: name }; }
 function replaceTextInSlide(s, i) { const reps = { '{{PetName}}': i.petName, '{{PetType}}': i.petType, '{{Sex}}': i.sex, '{{Breed}}': i.breed, '{{Age}}': i.age, '{{ColorMark}}': i.color, '{{ownerName}}': i.ownerName, '{{address}}': i.address, '{{tel}}': String(i.tel).replace(/^'/, '') }; for (let k in reps) { try { s.replaceAllText(k, String(reps[k] || '-')); } catch(e) {} } }
 function getOrCreateFolder(p, n) { const fs = p.getFoldersByName(n); return fs.hasNext() ? fs.next() : p.createFolder(n); }
