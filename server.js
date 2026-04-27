@@ -31,6 +31,50 @@ function buildPage() {
   const stub = `
 <script>
 (function() {
+  var MOCK_DATA = {
+    getPublicDashboardData: {
+      households: 128,
+      dogActual: 214,
+      catActual: 97,
+      totalActual: 311,
+      vaccinated: 186,
+      neutered: 142,
+      vaccinationRate: 59.8,
+      neuterRate: 45.7,
+      dogPercentage: 68.8,
+      catPercentage: 31.2,
+      unvaccinatedPercentage: 40.2,
+      dogTarget: 0,
+      catTarget: 0,
+      totalTarget: 0
+    },
+    getLostPetsPublic: { success: true, pets: [] },
+    checkSession: null,
+    getMemberDashboardData: {
+      dogActual: 2, dogTarget: 0,
+      catActual: 1, catTarget: 0,
+      totalActual: 3, totalTarget: 0,
+      vaccinated: 2,
+      neutered: 1,
+      currentTargets: [],
+      profileData: { fullName: 'ทดสอบ', idCard: '0000000000000', phone: '0800000000' }
+    },
+    getAdminDashboardData: {
+      success: true,
+      cardData: {
+        households: 128,
+        dogActual: 214, dogTarget: 0,
+        catActual: 97, catTarget: 0,
+        totalActual: 311, totalTarget: 0,
+        vaccinated: 186, neutered: 142
+      },
+      tableData: []
+    },
+    getStrayReports: { success: true, data: [] },
+    getStrayData: { success: true, data: [] },
+    getVolunteerData: { success: true, data: [] }
+  };
+
   function makeRunner() {
     var _success = null;
     var _failure = null;
@@ -44,7 +88,8 @@ function buildPage() {
         }
         return function() {
           var s = _success;
-          setTimeout(function() { if (s) s(null); }, 200);
+          var result = (prop in MOCK_DATA) ? MOCK_DATA[prop] : null;
+          setTimeout(function() { if (s) s(result); }, 200);
         };
       }
     };
