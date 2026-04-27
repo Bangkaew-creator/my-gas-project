@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "yu8TH1FOdFPELcUiU80Yb"
+uri = "file://exports/gas-project.zip"
+type = "unspecified"
+title = "GAS Project (ทุกไฟล์ที่แก้แล้ว) - กดดาวน์โหลด"
