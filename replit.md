@@ -40,6 +40,25 @@ Serves on `http://0.0.0.0:5000`
 ## Deployment
 The true deployment target is Google Apps Script. The Replit preview is for development reference only. Backend calls to `google.script.run` are stubbed out with no-op handlers in the preview.
 
+## clasp Push (No Shell Required)
+Workflow **"Push to GAS"** (`scripts/push-to-gas.js`) runs `clasp push --force`
+using credentials passed via either:
+- Secret `CLASPRC_JSON` (paste contents in Replit Secrets UI), or
+- A file `clasprc.json` in workspace root (drag-drop from local machine)
+
+Script ID is read from `.clasp.json` in workspace root, or Secret `GAS_SCRIPT_ID`.
+The script writes the auth file to a tempdir (mode 0600), runs clasp with `-A`/`-P`
+flags, and removes the temp file after. A `.claspignore` is auto-generated to
+include only `*.gs`, `*.html`, and `appsscript.json`.
+
+**One-time setup**:
+1. Run `clasp login` once on a personal computer with a browser (creates
+   `~/.clasprc.json`)
+2. Either drag `~/.clasprc.json` into Replit and rename to `clasprc.json`, or
+   paste its contents into Replit Secret `CLASPRC_JSON`
+3. Add Script ID to Secret `GAS_SCRIPT_ID` (or `.clasp.json`)
+4. Click "Run" on the "Push to GAS" workflow whenever you want to push
+
 ## GitHub → GAS Sync (No Shell Required)
 Admin dashboard tab "🔄 Sync โค้ดจาก GitHub" lets the script overwrite its own
 source files with the latest version from a configured GitHub repo, using
