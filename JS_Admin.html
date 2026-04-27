@@ -42,6 +42,7 @@
       <div class="admin-tabs">
         <button class="tab-btn active" onclick="switchAdminTab('search')">🔍 ค้นหา/จัดการรายตัว</button>
         <button class="tab-btn" onclick="switchAdminTab('dashboard')">📊 ภาพรวม & รายชื่อทั้งหมด</button>
+        <button class="tab-btn" onclick="switchAdminTab('sync')">🔄 Sync โค้ดจาก GitHub</button>
       </div>
 
       <!-- TAB 1: ค้นหาด่วน -->
@@ -61,6 +62,58 @@
           </form>
 
           <div id="qs-result" style="margin-top: 20px; text-align: left;"></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Sync จาก GitHub -->
+      <div id="tab-sync" class="tab-content">
+        <div class="search-box-card" style="text-align:left;">
+          <h3 style="margin-bottom: 10px; color: #333;">🔄 ดึงโค้ดล่าสุดจาก GitHub มาอัปเดตระบบ</h3>
+          <p style="color:#666; margin-bottom: 20px; font-size: 14px;">
+            กดปุ่ม Sync เพื่ออัปเดตโค้ดของระบบจาก GitHub repository โดยอัตโนมัติ — ไม่ต้องใช้ Shell หรือ clasp
+          </p>
+
+          <div id="sync-status-box" style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px; font-size:14px;">
+            <div style="text-align:center; color:#888;">กำลังโหลดสถานะ...</div>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+            <button class="form-button" style="width:auto; flex:1; min-width:160px;" onclick="handleTestGithub()">
+              🔌 ทดสอบการเชื่อมต่อ
+            </button>
+            <button class="form-button success" style="width:auto; flex:1; min-width:160px;" onclick="handleSyncFromGithub()">
+              🚀 Sync จาก GitHub ทันที
+            </button>
+          </div>
+
+          <details style="margin-top:15px;">
+            <summary style="cursor:pointer; color:#0066cc; font-weight:600; padding:8px;">⚙️ ตั้งค่า Repository</summary>
+            <div style="padding:15px; background:#fff; border:1px solid #eee; border-radius:6px; margin-top:8px;">
+              <div class="form-group">
+                <label>GitHub Repository (เช่น user/repo)</label>
+                <input type="text" id="sync-repo" class="form-input" placeholder="Bangkaew-creator/my-gas-project">
+              </div>
+              <div class="form-group">
+                <label>Branch</label>
+                <input type="text" id="sync-branch" class="form-input" placeholder="main">
+              </div>
+              <div class="form-group">
+                <label>GitHub Token (ใส่เฉพาะ private repo)</label>
+                <input type="password" id="sync-token" class="form-input" placeholder="ghp_xxx (ไม่กรอกถ้าเป็น public repo)">
+              </div>
+              <button class="form-button" style="width:auto;" onclick="handleSaveSyncConfig()">💾 บันทึกการตั้งค่า</button>
+            </div>
+          </details>
+
+          <div id="sync-result" style="margin-top:15px;"></div>
+
+          <div style="margin-top:25px; padding:15px; background:#fffbe6; border-left:4px solid #ffc107; border-radius:4px; font-size:13px; line-height:1.7;">
+            <strong>📌 ก่อนใช้งานครั้งแรก:</strong><br>
+            1. เปิด <a href="https://script.google.com/home/usersettings" target="_blank">Apps Script API</a> ให้เป็น <strong>ON</strong><br>
+            2. กลับมาที่หน้านี้ กด "🔌 ทดสอบการเชื่อมต่อ" — ถ้าผ่านแสดงว่าตั้งค่าถูกต้อง<br>
+            3. กด "🚀 Sync จาก GitHub ทันที" — ระบบจะดาวน์โหลดโค้ดล่าสุดจาก GitHub มาอัปเดตเอง<br>
+            4. ถ้า login หลุด ก็แค่ login Google ใหม่แล้วเข้าหน้านี้กดปุ่มได้เลย
+          </div>
         </div>
       </div>
 
@@ -119,6 +172,120 @@
     if (tabName === 'dashboard' && !isDashboardLoaded) {
       loadAdminData(null, null);
     }
+    if (tabName === 'sync') {
+      loadSyncStatus();
+    }
+  }
+
+  // ============== Sync จาก GitHub ==============
+  function _syncToken() { return localStorage.getItem('sessionToken') || ''; }
+
+  function loadSyncStatus() {
+    const box = document.getElementById('sync-status-box');
+    if (!box) return;
+    box.innerHTML = '<div style="text-align:center; color:#888;">กำลังโหลดสถานะ...</div>';
+    google.script.run
+      .withSuccessHandler(res => {
+        if (!res || !res.success) {
+          box.innerHTML = '<div style="color:#d33;">โหลดสถานะไม่ได้: ' + (res && res.message || '') + '</div>';
+          return;
+        }
+        document.getElementById('sync-repo').value = res.repo || '';
+        document.getElementById('sync-branch').value = res.branch || 'main';
+        box.innerHTML = `
+          <div><strong>Repository:</strong> <code>${res.repo}</code> <span style="color:#888;">(branch: ${res.branch})</span></div>
+          <div style="margin-top:6px;"><strong>Script ID:</strong> <code style="font-size:11px;">${res.scriptId || '-'}</code></div>
+          <div style="margin-top:6px;"><strong>Sync ครั้งล่าสุด:</strong> ${res.lastSyncAt || '<span style="color:#888;">ยังไม่เคย Sync</span>'}</div>
+          <div style="margin-top:6px;"><strong>Token:</strong> ${res.hasToken ? '✓ ตั้งค่าแล้ว (private repo)' : '<span style="color:#888;">ไม่ได้ตั้ง (public repo)</span>'}</div>
+        `;
+      })
+      .withFailureHandler(err => {
+        box.innerHTML = '<div style="color:#d33;">ผิดพลาด: ' + err.message + '</div>';
+      })
+      .getSyncStatus(_syncToken());
+  }
+
+  function handleTestGithub() {
+    const out = document.getElementById('sync-result');
+    out.innerHTML = '<div class="status-alert" style="background:#e7f3ff; color:#0066cc;">⏳ กำลังทดสอบเชื่อมต่อ GitHub...</div>';
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res.success) {
+          out.innerHTML = `
+            <div class="status-alert status-success">
+              <strong>✅ ${res.message}</strong><br>
+              พบไฟล์ทั้งหมด ${res.fileCount} ไฟล์: <code style="font-size:11px;">${res.files.join(', ')}</code>
+            </div>`;
+        } else {
+          out.innerHTML = '<div class="status-alert" style="background:#ffe7e7; color:#a00;"><strong>❌ ' + res.message + '</strong></div>';
+        }
+      })
+      .withFailureHandler(err => {
+        out.innerHTML = '<div class="status-alert" style="background:#ffe7e7; color:#a00;"><strong>❌ ' + err.message + '</strong></div>';
+      })
+      .testGitHubConnection(_syncToken());
+  }
+
+  function handleSyncFromGithub() {
+    Swal.fire({
+      title: 'ยืนยันการ Sync',
+      text: 'จะดาวน์โหลดโค้ดล่าสุดจาก GitHub มาทับไฟล์ปัจจุบันทั้งหมด แน่ใจหรือไม่?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'ใช่, Sync เลย',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#28a745'
+    }).then(result => {
+      if (!result.isConfirmed) return;
+      const out = document.getElementById('sync-result');
+      out.innerHTML = '<div class="status-alert" style="background:#e7f3ff; color:#0066cc;">🚀 กำลัง Sync... โปรดรอ (ใช้เวลา 5-30 วินาที)</div>';
+      showLoader(true);
+      google.script.run
+        .withSuccessHandler(res => {
+          showLoader(false);
+          if (res.success) {
+            out.innerHTML = `
+              <div class="status-alert status-success">
+                <strong>✅ ${res.message}</strong><br>
+                <small>รวม ${res.total} ไฟล์${res.preserved && res.preserved.length ? ' (คงเดิม: ' + res.preserved.join(', ') + ')' : ''}${res.skipped && res.skipped.length ? '<br>ข้าม: ' + res.skipped.join(', ') : ''}</small>
+              </div>`;
+            loadSyncStatus();
+            Swal.fire({ icon: 'success', title: 'Sync สำเร็จ', text: 'รีเฟรชหน้าเว็บเพื่อดูเวอร์ชันใหม่', timer: 3000 });
+          } else {
+            out.innerHTML = `
+              <div class="status-alert" style="background:#ffe7e7; color:#a00;">
+                <strong>❌ ${res.message}</strong>
+                ${res.hint ? '<br><em>คำแนะนำ: ' + res.hint + '</em>' : ''}
+              </div>`;
+          }
+        })
+        .withFailureHandler(err => {
+          showLoader(false);
+          out.innerHTML = '<div class="status-alert" style="background:#ffe7e7; color:#a00;"><strong>❌ ' + err.message + '</strong></div>';
+        })
+        .syncFromGitHub(_syncToken());
+    });
+  }
+
+  function handleSaveSyncConfig() {
+    const repo = document.getElementById('sync-repo').value.trim();
+    const branch = document.getElementById('sync-branch').value.trim() || 'main';
+    const token = document.getElementById('sync-token').value;
+    const out = document.getElementById('sync-result');
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res.success) {
+          out.innerHTML = '<div class="status-alert status-success">✅ ' + res.message + '</div>';
+          document.getElementById('sync-token').value = '';
+          loadSyncStatus();
+        } else {
+          out.innerHTML = '<div class="status-alert" style="background:#ffe7e7; color:#a00;">❌ ' + res.message + '</div>';
+        }
+      })
+      .withFailureHandler(err => {
+        out.innerHTML = '<div class="status-alert" style="background:#ffe7e7; color:#a00;">❌ ' + err.message + '</div>';
+      })
+      .saveSyncConfig(_syncToken(), repo, branch, token);
   }
 
   // --- TAB 1: Quick Search Logic ---

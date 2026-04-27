@@ -72,7 +72,29 @@ function buildPage() {
     },
     getStrayReports: { success: true, data: [] },
     getStrayData: { success: true, data: [] },
-    getVolunteerData: { success: true, data: [] }
+    getVolunteerData: { success: true, data: [] },
+    getSyncStatus: {
+      success: true,
+      repo: 'Bangkaew-creator/my-gas-project',
+      branch: 'main',
+      hasToken: false,
+      lastSyncAt: '',
+      scriptId: '(จะแสดงเมื่อรันบน GAS)'
+    },
+    testGitHubConnection: {
+      success: true,
+      message: '[Preview] โหมดทดสอบ — บน GAS จริงจะเชื่อมต่อ GitHub',
+      fileCount: 24,
+      files: ['Code.gs', 'Auth.gs', 'CRUD_Member.gs', 'Sync_GitHub.gs', '...']
+    },
+    syncFromGitHub: {
+      success: true,
+      message: '[Preview] โหมดทดสอบ — บน GAS จริงจะอัปเดตโค้ดจริง',
+      total: 24,
+      preserved: [],
+      skipped: []
+    },
+    saveSyncConfig: { success: true, message: '[Preview] บันทึกแล้ว' }
   };
 
   function makeRunner() {

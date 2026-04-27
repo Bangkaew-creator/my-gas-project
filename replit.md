@@ -28,6 +28,7 @@ For Replit preview, `server.js` assembles all HTML parts into one complete page 
 - `JS_Member.html` — Member dashboard JS
 - `JS_Admin.html` — Admin dashboard JS
 - `JS_Stray.html` — Stray animal reporting JS
+- `Sync_GitHub.gs` — GitHub→GAS self-update sync (admin-only button on dashboard)
 - `appsscript.json` — Apps Script manifest (OAuth scopes, web app settings)
 
 ## Running Locally
@@ -38,3 +39,14 @@ Serves on `http://0.0.0.0:5000`
 
 ## Deployment
 The true deployment target is Google Apps Script. The Replit preview is for development reference only. Backend calls to `google.script.run` are stubbed out with no-op handlers in the preview.
+
+## GitHub → GAS Sync (No Shell Required)
+Admin dashboard tab "🔄 Sync โค้ดจาก GitHub" lets the script overwrite its own
+source files with the latest version from a configured GitHub repo, using
+the Apps Script API (`projects.updateContent`) and the user's OAuth token via
+`ScriptApp.getOAuthToken()`. All sync RPCs require an Admin session token
+(validated through `Auth.gs#checkSession`). Configuration is stored in
+Script Properties: `GITHUB_REPO`, `GITHUB_BRANCH`, `GITHUB_TOKEN` (only for
+private repos). One-time setup: enable the Apps Script API in the Google
+account, then re-authorize the script after the new OAuth scopes
+(`script.external_request`, `script.projects`) are added.
